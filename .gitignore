@@ -1,0 +1,41 @@
+# macOS system files
+.DS_Store
+
+# Xcode
+*.xcworkspace
+*.xcuserstate
+*.xcuserdata/
+DerivedData/
+.build/
+.swiftpm/
+*.xcassets/*/*.png
+*.xcassets/*/*.jpg
+
+# Swift Package Manager
+.swiftpm/
+Package.resolved
+
+# CocoaPods (if using)
+Pods/
+Podfile.lock
+
+# Firebase (Sensitive API keys)
+GoogleService-Info.plist
+
+# Carthage
+Carthage/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Archives
+*.ipa
+*.dSYM.zip
+*.xcarchive
+
+# Logs & Temporary Files
+*.log
+*.tmp
