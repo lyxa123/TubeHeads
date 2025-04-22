@@ -5,6 +5,7 @@ struct HomepageView: View {
     @Binding var showSignInView: Bool
     @State private var showMenu = false
     @State private var navigateToSettings = false
+    @State private var showSearch = false
     @State private var username: String = ""
     @State private var isLoadingUsername: Bool = false
     
@@ -45,6 +46,10 @@ struct HomepageView: View {
                 NavigationLink(destination: SettingsView(showSignInView: $showSignInView), isActive: $navigateToSettings) {
                     EmptyView()
                 }
+                
+                NavigationLink(destination: SearchView(), isActive: $showSearch) {
+                    EmptyView()
+                }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -62,7 +67,7 @@ struct HomepageView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
-                        // Search functionality would go here
+                        showSearch = true
                     }) {
                         Image(systemName: "magnifyingglass")
                             .imageScale(.large)
@@ -101,6 +106,7 @@ struct HomepageView: View {
 }
 
 struct SideMenuView: View {
+    @EnvironmentObject private var authManager: AuthManager
     @Binding var showMenu: Bool
     @Binding var showSignInView: Bool
     @State private var navigateToSettings = false
@@ -285,12 +291,8 @@ struct SideMenuView: View {
                         
                         // Sign out after menu closes
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            do {
-                                try AuthenticationManager.shared.SignOut()
-                                showSignInView = true
-                            } catch {
-                                print("Error signing out: \(error)")
-                            }
+                            authManager.signOut()
+                            showSignInView = true
                         }
                     } label: {
                         HStack {

@@ -85,19 +85,21 @@ struct SignInView: View {
             } label: {
                 if isLoading {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .progressViewStyle(CircularProgressViewStyle(tint: .black))
                         .frame(height: 55)
                         .frame(maxWidth: .infinity)
-                        .background(Color.blue)
+                        .background(Color(hex: "#f6bebe"))
                         .cornerRadius(10)
+                        .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
                 } else {
                     Text("Sign In")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(.black)
                         .frame(height: 55)
                         .frame(maxWidth: .infinity)
-                        .background(Color.blue)
+                        .background(Color(hex: "#f6bebe"))
                         .cornerRadius(10)
+                        .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
                 }
             }
             .disabled(isLoading)
