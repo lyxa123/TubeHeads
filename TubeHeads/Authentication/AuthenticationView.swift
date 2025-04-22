@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AuthenticationView: View {
-    
+    @EnvironmentObject private var authManager: AuthManager
     @Binding var showSignInView: Bool
     
     var body: some View {
@@ -66,6 +66,7 @@ struct AuthenticationView_Preview: PreviewProvider {
     static var previews: some View {
         NavigationStack {
             AuthenticationView(showSignInView: .constant(false))
+                .environmentObject(AuthManager())
         }
     }
 }
