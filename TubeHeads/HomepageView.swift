@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct HomepageView: View {
+    @EnvironmentObject private var authManager: AuthManager
     @Binding var showSignInView: Bool
     @State private var showMenu = false
     @State private var navigateToSettings = false
@@ -10,14 +11,25 @@ struct HomepageView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                VStack {
-                    Text("TubeHeads")
-                        .font(.largeTitle)
-                        .padding()
-                    
-                    Spacer()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        Text("TubeHeads")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .padding(.horizontal)
+                        
+                        // Featured section could go here
+                        
+                        // Trending TV Shows
+                        TrendingTVView()
+                            .padding(.top, 8)
+                        
+                        // More sections could be added here
+                        
+                        Spacer(minLength: 60)
+                    }
+                    .padding(.top)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 
                 // Slide-out menu
                 if showMenu {
@@ -80,20 +92,10 @@ struct HomepageView: View {
         
         isLoadingUsername = true
         Task {
-            do {
-                let authUser = try AuthenticationManager.shared.getAuthenticatedUser()
-                let userData = try await UserManager.shared.getUser(userId: authUser.uid)
-                
-                DispatchQueue.main.async {
-                    self.username = userData.username
-                    self.isLoadingUsername = false
-                }
-            } catch {
-                print("Error loading username: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    self.isLoadingUsername = false
-                }
+            if let username = await authManager.getCurrentUsername() {
+                self.username = username
             }
+            isLoadingUsername = false
         }
     }
 }

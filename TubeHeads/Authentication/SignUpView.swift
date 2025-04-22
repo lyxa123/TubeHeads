@@ -10,7 +10,7 @@ final class SignUpViewModel: ObservableObject {
     @Published var errorMessage = ""
     @Published var showError = false
     
-    func signUp() async {
+    func signUp(authManager: AuthManager) async {
         // Validate input
         if email.isEmpty || password.isEmpty || username.isEmpty {
             errorMessage = "Please fill in all fields."
@@ -48,11 +48,8 @@ final class SignUpViewModel: ObservableObject {
                 return
             }
             
-            // Create the user in Firebase Auth
-            let authDataResult = try await AuthenticationManager.shared.createUser(email: email, password: password)
-            
-            // Create user profile in Firestore
-            try await UserManager.shared.createNewUser(auth: authDataResult, username: username)
+            // Create user with our AuthManager
+            try await authManager.createAccount(email: email, password: password, username: username)
             
             return
         } catch {
@@ -81,6 +78,7 @@ final class SignUpViewModel: ObservableObject {
 
 struct SignUpView: View {
     @StateObject private var viewModel = SignUpViewModel()
+    @EnvironmentObject private var authManager: AuthManager
     @Binding var showSignInView: Bool
     @State private var isLoading = false
     
@@ -124,7 +122,7 @@ struct SignUpView: View {
             Button {
                 Task {
                     isLoading = true
-                    await viewModel.signUp()
+                    await viewModel.signUp(authManager: authManager)
                     isLoading = false
                     if !viewModel.showError {
                         showSignInView = false
