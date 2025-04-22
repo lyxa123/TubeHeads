@@ -1,5 +1,5 @@
-
 import Foundation
+import FirebaseCore
 import FirebaseAuth
 
 struct AuthDataResultModel {

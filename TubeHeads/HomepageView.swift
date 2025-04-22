@@ -4,6 +4,8 @@ struct HomepageView: View {
     @Binding var showSignInView: Bool
     @State private var showMenu = false
     @State private var navigateToSettings = false
+    @State private var username: String = ""
+    @State private var isLoadingUsername: Bool = false
     
     var body: some View {
         NavigationStack {
@@ -21,7 +23,8 @@ struct HomepageView: View {
                 if showMenu {
                     SideMenuView(
                         showMenu: $showMenu,
-                        showSignInView: $showSignInView
+                        showSignInView: $showSignInView,
+                        username: username
                     )
                     .transition(.move(edge: .leading))
                     .zIndex(1)
@@ -35,6 +38,7 @@ struct HomepageView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: {
+                        loadUsername()
                         withAnimation {
                             showMenu.toggle()
                         }
@@ -58,6 +62,7 @@ struct HomepageView: View {
             DragGesture()
                 .onEnded { value in
                     if value.translation.width > 50 {
+                        loadUsername()
                         withAnimation {
                             showMenu = true
                         }
@@ -69,12 +74,35 @@ struct HomepageView: View {
                 }
         )
     }
+    
+    private func loadUsername() {
+        guard !isLoadingUsername && username.isEmpty else { return }
+        
+        isLoadingUsername = true
+        Task {
+            do {
+                let authUser = try AuthenticationManager.shared.getAuthenticatedUser()
+                let userData = try await UserManager.shared.getUser(userId: authUser.uid)
+                
+                DispatchQueue.main.async {
+                    self.username = userData.username
+                    self.isLoadingUsername = false
+                }
+            } catch {
+                print("Error loading username: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.isLoadingUsername = false
+                }
+            }
+        }
+    }
 }
 
 struct SideMenuView: View {
     @Binding var showMenu: Bool
     @Binding var showSignInView: Bool
     @State private var navigateToSettings = false
+    var username: String
     
     var body: some View {
         ZStack {
@@ -105,9 +133,32 @@ struct SideMenuView: View {
                         }
                     }
                     
-                    // Add padding to push menu items down
+                    // User greeting
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Hello,")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                        
+                        if username.isEmpty {
+                            Text("User")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                        } else {
+                            Text(username)
+                                .font(.title2)
+                                .fontWeight(.bold)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 24)
+                    
+                    // Add divider 
+                    Divider()
+                        .padding(.horizontal)
+                    
+                    // Add more padding to push menu items down
                     Spacer()
-                        .frame(height: 20)
+                        .frame(height: 40)
                     
                     // Profile (non-functional)
                     Button {
@@ -193,6 +244,11 @@ struct SideMenuView: View {
                         .contentShape(Rectangle())
                     }
                     
+                    Spacer()
+                    
+                    Divider()
+                        .padding(.horizontal)
+                    
                     // Settings (functional)
                     Button {
                         withAnimation {
@@ -255,6 +311,7 @@ struct SideMenuView: View {
                     }
                     
                     Spacer()
+                        .frame(height: 20)
                 }
                 .frame(width: 250)
                 .background(Color(UIColor.systemBackground))
