@@ -6,23 +6,16 @@ struct RootView: View {
     
     var body: some View {
         ZStack {
-            NavigationStack {
-                if showSignInView {
-                    AuthenticationView(showSignInView: $showSignInView)
-                } else {
-                    HomepageView(showSignInView: $showSignInView) // Navigate to HomepageView
+            if !showSignInView {
+                NavigationStack {
+                    HomepageView(showSignInView: $showSignInView)
                 }
             }
         }
-        
-        .id(showSignInView)
-        
         .onAppear {
-            let authuser = try? AuthenticationManager.shared.getAuthenticatedUser()
-            self.showSignInView = authuser == nil
+            let authUser = try? AuthenticationManager.shared.getAuthenticatedUser()
+            self.showSignInView = authUser == nil
         }
-        
-        
         .fullScreenCover(isPresented: $showSignInView) {
             NavigationStack {
                 AuthenticationView(showSignInView: $showSignInView)
@@ -30,7 +23,6 @@ struct RootView: View {
         }
     }
 }
-
 
 #Preview {
     RootView()
