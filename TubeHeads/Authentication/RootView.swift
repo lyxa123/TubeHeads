@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct RootView: View {
-    
+    @EnvironmentObject private var authManager: AuthManager
     @State private var showSignInView: Bool = false
     
     var body: some View {
@@ -13,8 +13,7 @@ struct RootView: View {
             }
         }
         .onAppear {
-            let authUser = try? AuthenticationManager.shared.getAuthenticatedUser()
-            self.showSignInView = authUser == nil
+            showSignInView = !authManager.isSignedIn
         }
         .fullScreenCover(isPresented: $showSignInView) {
             NavigationStack {
@@ -26,4 +25,5 @@ struct RootView: View {
 
 #Preview {
     RootView()
+        .environmentObject(AuthManager())
 }

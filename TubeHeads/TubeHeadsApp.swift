@@ -11,6 +11,7 @@ import FirebaseCore
 struct TubeHeadsApp: App {
     
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    @StateObject private var authManager = AuthManager()
     
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -30,6 +31,7 @@ struct TubeHeadsApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .environmentObject(authManager)
         }
         .modelContainer(sharedModelContainer)
     }

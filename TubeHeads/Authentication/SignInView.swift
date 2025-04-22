@@ -8,7 +8,7 @@ final class SignInViewModel: ObservableObject {
     @Published var errorMessage = ""
     @Published var showError = false
     
-    func signIn() async {
+    func signIn(authManager: AuthManager) async {
         guard !email.isEmpty, !password.isEmpty else {
             errorMessage = "Please enter both email and password."
             showError = true
@@ -16,7 +16,7 @@ final class SignInViewModel: ObservableObject {
         }
         
         do {
-            try await AuthenticationManager.shared.signInUser(email: email, password: password)
+            try await authManager.signIn(email: email, password: password)
             return
         } catch {
             handleAuthError(error)
@@ -44,6 +44,7 @@ final class SignInViewModel: ObservableObject {
 
 struct SignInView: View {
     @StateObject private var viewModel = SignInViewModel()
+    @EnvironmentObject private var authManager: AuthManager
     @Binding var showSignInView: Bool
     @State private var isLoading = false
     
@@ -75,7 +76,7 @@ struct SignInView: View {
             Button {
                 Task {
                     isLoading = true
-                    await viewModel.signIn()
+                    await viewModel.signIn(authManager: authManager)
                     isLoading = false
                     if !viewModel.showError {
                         showSignInView = false
@@ -84,19 +85,21 @@ struct SignInView: View {
             } label: {
                 if isLoading {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .progressViewStyle(CircularProgressViewStyle(tint: .black))
                         .frame(height: 55)
                         .frame(maxWidth: .infinity)
-                        .background(Color.blue)
+                        .background(Color(hex: "#f6bebe"))
                         .cornerRadius(10)
+                        .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
                 } else {
                     Text("Sign In")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(.black)
                         .frame(height: 55)
                         .frame(maxWidth: .infinity)
-                        .background(Color.blue)
+                        .background(Color(hex: "#f6bebe"))
                         .cornerRadius(10)
+                        .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
                 }
             }
             .disabled(isLoading)
