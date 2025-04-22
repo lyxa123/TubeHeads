@@ -6,13 +6,14 @@ final class SignUpViewModel: ObservableObject {
     @Published var email = ""
     @Published var password = ""
     @Published var confirmPassword = ""
+    @Published var username = ""
     @Published var errorMessage = ""
     @Published var showError = false
     
-    func signUp() async {
+    func signUp(authManager: AuthManager) async {
         // Validate input
-        if email.isEmpty || password.isEmpty {
-            errorMessage = "Please enter both email and password."
+        if email.isEmpty || password.isEmpty || username.isEmpty {
+            errorMessage = "Please fill in all fields."
             showError = true
             return
         }
@@ -29,8 +30,27 @@ final class SignUpViewModel: ObservableObject {
             return
         }
         
+        // Check if username is valid (only alphanumeric and underscore)
+        let usernameRegex = "^[a-zA-Z0-9_]{3,20}$"
+        let usernamePredicate = NSPredicate(format: "SELF MATCHES %@", usernameRegex)
+        if !usernamePredicate.evaluate(with: username) {
+            errorMessage = "Username must be 3-20 characters and contain only letters, numbers, and underscores."
+            showError = true
+            return
+        }
+        
+        // Check if username already exists
         do {
-            try await AuthenticationManager.shared.createUser(email: email, password: password)
+            let usernameExists = try await UserManager.shared.usernameExists(username)
+            if usernameExists {
+                errorMessage = "Username already taken. Please choose another."
+                showError = true
+                return
+            }
+            
+            // Create user with our AuthManager
+            try await authManager.createAccount(email: email, password: password, username: username)
+            
             return
         } catch {
             handleAuthError(error)
@@ -58,6 +78,7 @@ final class SignUpViewModel: ObservableObject {
 
 struct SignUpView: View {
     @StateObject private var viewModel = SignUpViewModel()
+    @EnvironmentObject private var authManager: AuthManager
     @Binding var showSignInView: Bool
     @State private var isLoading = false
     
@@ -71,6 +92,13 @@ struct SignUpView: View {
             TextField("Email", text: $viewModel.email)
                 .autocapitalization(.none)
                 .keyboardType(.emailAddress)
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(10)
+            
+            TextField("Username", text: $viewModel.username)
+                .autocapitalization(.none)
+                .disableAutocorrection(true)
                 .padding()
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(10)
@@ -94,7 +122,7 @@ struct SignUpView: View {
             Button {
                 Task {
                     isLoading = true
-                    await viewModel.signUp()
+                    await viewModel.signUp(authManager: authManager)
                     isLoading = false
                     if !viewModel.showError {
                         showSignInView = false
@@ -103,19 +131,21 @@ struct SignUpView: View {
             } label: {
                 if isLoading {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .progressViewStyle(CircularProgressViewStyle(tint: .black))
                         .frame(height: 55)
                         .frame(maxWidth: .infinity)
-                        .background(Color.green)
+                        .background(Color(hex: "#f6bebe"))
                         .cornerRadius(10)
+                        .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
                 } else {
                     Text("Create Account")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(.black)
                         .frame(height: 55)
                         .frame(maxWidth: .infinity)
-                        .background(Color.green)
+                        .background(Color(hex: "#f6bebe"))
                         .cornerRadius(10)
+                        .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
                 }
             }
             .disabled(isLoading)
