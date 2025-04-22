@@ -13,6 +13,8 @@
 		223373A72D8BB4D90020B861 /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = 223373A62D8BB4D90020B861 /* FirebaseDatabase */; };
 		223373A92D8BB4D90020B861 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 223373A82D8BB4D90020B861 /* FirebaseStorage */; };
 		223373BF2D8BC9090020B861 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = 223373BE2D8BC9090020B861 /* FirebaseAnalyticsOnDeviceConversion */; };
+		22E1D5B62DB784E900C5DAA8 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 22E1D5B52DB784E900C5DAA8 /* FirebaseFirestore */; };
+		22E1D5B82DB7853B00C5DAA8 /* FirebaseFirestoreCombine-Community in Frameworks */ = {isa = PBXBuildFile; productRef = 22E1D5B72DB7853B00C5DAA8 /* FirebaseFirestoreCombine-Community */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -62,11 +64,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				223373A12D8BB4D90020B861 /* FirebaseAnalytics in Frameworks */,
+				22E1D5B82DB7853B00C5DAA8 /* FirebaseFirestoreCombine-Community in Frameworks */,
 				223373BF2D8BC9090020B861 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */,
 				223373A52D8BB4D90020B861 /* FirebaseAuthCombine-Community in Frameworks */,
 				223373A72D8BB4D90020B861 /* FirebaseDatabase in Frameworks */,
 				223373A92D8BB4D90020B861 /* FirebaseStorage in Frameworks */,
 				223373A32D8BB4D90020B861 /* FirebaseAuth in Frameworks */,
+				22E1D5B62DB784E900C5DAA8 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -141,6 +145,8 @@
 				223373A62D8BB4D90020B861 /* FirebaseDatabase */,
 				223373A82D8BB4D90020B861 /* FirebaseStorage */,
 				223373BE2D8BC9090020B861 /* FirebaseAnalyticsOnDeviceConversion */,
+				22E1D5B52DB784E900C5DAA8 /* FirebaseFirestore */,
+				22E1D5B72DB7853B00C5DAA8 /* FirebaseFirestoreCombine-Community */,
 			);
 			productName = TubeHeads;
 			productReference = 2233735D2D8B82140020B861 /* TubeHeads.app */;
@@ -632,6 +638,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2233739F2D8BB4D90020B861 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAnalyticsOnDeviceConversion;
+		};
+		22E1D5B52DB784E900C5DAA8 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2233739F2D8BB4D90020B861 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		22E1D5B72DB7853B00C5DAA8 /* FirebaseFirestoreCombine-Community */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2233739F2D8BB4D90020B861 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = "FirebaseFirestoreCombine-Community";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

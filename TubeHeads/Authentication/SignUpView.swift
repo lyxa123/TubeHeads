@@ -6,13 +6,14 @@ final class SignUpViewModel: ObservableObject {
     @Published var email = ""
     @Published var password = ""
     @Published var confirmPassword = ""
+    @Published var username = ""
     @Published var errorMessage = ""
     @Published var showError = false
     
     func signUp() async {
         // Validate input
-        if email.isEmpty || password.isEmpty {
-            errorMessage = "Please enter both email and password."
+        if email.isEmpty || password.isEmpty || username.isEmpty {
+            errorMessage = "Please fill in all fields."
             showError = true
             return
         }
@@ -29,8 +30,30 @@ final class SignUpViewModel: ObservableObject {
             return
         }
         
+        // Check if username is valid (only alphanumeric and underscore)
+        let usernameRegex = "^[a-zA-Z0-9_]{3,20}$"
+        let usernamePredicate = NSPredicate(format: "SELF MATCHES %@", usernameRegex)
+        if !usernamePredicate.evaluate(with: username) {
+            errorMessage = "Username must be 3-20 characters and contain only letters, numbers, and underscores."
+            showError = true
+            return
+        }
+        
+        // Check if username already exists
         do {
-            try await AuthenticationManager.shared.createUser(email: email, password: password)
+            let usernameExists = try await UserManager.shared.usernameExists(username)
+            if usernameExists {
+                errorMessage = "Username already taken. Please choose another."
+                showError = true
+                return
+            }
+            
+            // Create the user in Firebase Auth
+            let authDataResult = try await AuthenticationManager.shared.createUser(email: email, password: password)
+            
+            // Create user profile in Firestore
+            try await UserManager.shared.createNewUser(auth: authDataResult, username: username)
+            
             return
         } catch {
             handleAuthError(error)
@@ -71,6 +94,13 @@ struct SignUpView: View {
             TextField("Email", text: $viewModel.email)
                 .autocapitalization(.none)
                 .keyboardType(.emailAddress)
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(10)
+            
+            TextField("Username", text: $viewModel.username)
+                .autocapitalization(.none)
+                .disableAutocorrection(true)
                 .padding()
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(10)
