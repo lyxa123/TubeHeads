@@ -111,6 +111,8 @@ struct SideMenuView: View {
     @Binding var showSignInView: Bool
     @State private var navigateToSettings = false
     @State private var navigateToProfile = false
+    @State private var navigateToWatchlist = false
+    @State private var navigateToLists = false
     var username: String
     
     var body: some View {
@@ -195,10 +197,41 @@ struct SideMenuView: View {
                         .contentShape(Rectangle())
                     }
                     
-                    // Lists (non-functional)
+                    // Watchlist (functional)
                     Button {
                         withAnimation {
                             showMenu = false
+                        }
+                        
+                        // Navigate to watchlist after menu closes
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            navigateToWatchlist = true
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "bookmark.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
+                            Text("Watchlist")
+                                .font(.headline)
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 12)
+                        .foregroundColor(.primary)
+                        .contentShape(Rectangle())
+                    }
+                    
+                    // Lists (functional)
+                    Button {
+                        withAnimation {
+                            showMenu = false
+                        }
+                        
+                        // Navigate to lists after menu closes
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            navigateToLists = true
                         }
                     } label: {
                         HStack {
@@ -206,7 +239,7 @@ struct SideMenuView: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 20, height: 20)
-                            Text("Lists")
+                            Text("My Lists")
                                 .font(.headline)
                             Spacer()
                         }
@@ -317,6 +350,14 @@ struct SideMenuView: View {
                     }
                     
                     NavigationLink(destination: ProfileView().environmentObject(authManager), isActive: $navigateToProfile) {
+                        EmptyView()
+                    }
+                    
+                    NavigationLink(destination: WatchlistView().environmentObject(authManager), isActive: $navigateToWatchlist) {
+                        EmptyView()
+                    }
+                    
+                    NavigationLink(destination: UserListsView().environmentObject(authManager), isActive: $navigateToLists) {
                         EmptyView()
                     }
                     

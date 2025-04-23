@@ -7,9 +7,9 @@ struct FirestoreShow: Identifiable, Codable {
     let tmdbId: Int
     let name: String
     let overview: String
-    let posterPath: String?
-    let backdropPath: String?
-    let firstAirDate: String?
+    var posterPath: String?
+    var backdropPath: String?
+    var firstAirDate: String?
     
     // Firestore-specific fields
     var userRatings: [String: Double] = [:]  // userId: rating

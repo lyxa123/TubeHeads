@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 enum Tab {
-    case home, search, trending, profile
+    case home, search, watchlist, lists, trending, profile
 }
 
 struct ContentView: View {
@@ -29,6 +29,22 @@ struct ContentView: View {
                 Label("Search", systemImage: "magnifyingglass")
             }
             .tag(Tab.search)
+            
+            NavigationView {
+                WatchlistView()
+            }
+            .tabItem {
+                Label("Watchlist", systemImage: "bookmark")
+            }
+            .tag(Tab.watchlist)
+            
+            NavigationView {
+                UserListsView()
+            }
+            .tabItem {
+                Label("Lists", systemImage: "list.bullet")
+            }
+            .tag(Tab.lists)
             
             NavigationView {
                 TrendingTVView()

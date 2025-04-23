@@ -1,0 +1,763 @@
+import SwiftUI
+import FirebaseFirestore
+
+struct UserListsView: View {
+    @EnvironmentObject private var authManager: AuthManager
+    @State private var userLists: [ShowList] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var showCreateListSheet = false
+    @State private var selectedFilter: ListFilter = .yourList
+    
+    enum ListFilter: String, CaseIterable {
+        case yourList = "Your List"
+        case likedList = "Liked List"
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Filter tabs
+            HStack(spacing: 0) {
+                ForEach(ListFilter.allCases, id: \.self) { filter in
+                    Button(action: {
+                        selectedFilter = filter
+                    }) {
+                        Text(filter.rawValue)
+                            .fontWeight(selectedFilter == filter ? .semibold : .regular)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 20)
+                    }
+                    .background(selectedFilter == filter ? Color.gray.opacity(0.2) : Color.clear)
+                    .cornerRadius(4)
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    // Search action
+                }) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.primary)
+                }
+                .padding(.horizontal)
+            }
+            .padding(.horizontal)
+            
+            if isLoading {
+                ProgressView("Loading lists...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = errorMessage {
+                VStack(spacing: 10) {
+                    Text("Error loading lists")
+                        .font(.headline)
+                        .foregroundColor(.red)
+                    
+                    Text(error)
+                        .foregroundColor(.gray)
+                    
+                    Button("Try Again") {
+                        Task {
+                            await loadUserLists()
+                        }
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if userLists.isEmpty && selectedFilter == .yourList {
+                VStack(spacing: 20) {
+                    Image(systemName: "list.bullet.clipboard")
+                        .font(.system(size: 60))
+                        .foregroundColor(.gray)
+                    
+                    Text("You haven't created any lists yet")
+                        .font(.title3)
+                        .fontWeight(.medium)
+                    
+                    Text("Create your first list to keep track of TV shows you want to watch or ones you love.")
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.gray)
+                        .padding(.horizontal)
+                    
+                    Button(action: {
+                        showCreateListSheet = true
+                    }) {
+                        HStack {
+                            Image(systemName: "plus.circle.fill")
+                            Text("Create List")
+                        }
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                }
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // List content
+                ScrollView {
+                    VStack(spacing: 20) {
+                        ForEach(userLists) { list in
+                            NavigationLink(destination: ListDetailView(list: list)) {
+                                ListCardView(list: list)
+                            }
+                        }
+                    }
+                    .padding()
+                }
+            }
+        }
+        .navigationTitle("Lists")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if selectedFilter == .yourList {
+                    Button(action: {
+                        showCreateListSheet = true
+                    }) {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+        }
+        .onAppear {
+            Task {
+                await loadUserLists()
+            }
+        }
+        .sheet(isPresented: $showCreateListSheet) {
+            CreateListView(onListCreated: { newList in
+                userLists.insert(newList, at: 0)
+            })
+        }
+    }
+    
+    private func loadUserLists() async {
+        guard let userId = authManager.currentUser?.uid else {
+            isLoading = false
+            errorMessage = "You must be signed in to view lists"
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            if selectedFilter == .yourList {
+                userLists = try await ListService.shared.getUserLists(userId: userId)
+            } else {
+                // TODO: Implement liked lists logic when available
+                userLists = []
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+            print("Error loading user lists: \(error)")
+        }
+        
+        isLoading = false
+    }
+}
+
+struct ListCardView: View {
+    let list: ShowList
+    @State private var listShows: [FirestoreShow] = []
+    @State private var isLoading = true
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Title and lock icon for private lists
+            HStack {
+                Text(list.name)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                if list.isPrivate {
+                    Image(systemName: "lock.fill")
+                        .foregroundColor(.gray)
+                        .font(.caption)
+                }
+            }
+            
+            // Description
+            Text(list.description)
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .lineLimit(2)
+            
+            // Show preview images (if available)
+            if isLoading {
+                HStack {
+                    ForEach(0..<3, id: \.self) { _ in
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(width: 80, height: 120)
+                            .cornerRadius(6)
+                    }
+                }
+            } else if !listShows.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(listShows.prefix(4)) { show in
+                            if let posterURL = show.posterURL {
+                                AsyncImage(url: posterURL) { phase in
+                                    switch phase {
+                                    case .empty:
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.3))
+                                            .frame(width: 80, height: 120)
+                                            .cornerRadius(6)
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 80, height: 120)
+                                            .cornerRadius(6)
+                                    case .failure:
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.3))
+                                            .frame(width: 80, height: 120)
+                                            .cornerRadius(6)
+                                            .overlay(
+                                                Image(systemName: "photo")
+                                                    .foregroundColor(.gray)
+                                            )
+                                    @unknown default:
+                                        EmptyView()
+                                    }
+                                }
+                            } else {
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 80, height: 120)
+                                    .cornerRadius(6)
+                                    .overlay(
+                                        Image(systemName: "photo")
+                                            .foregroundColor(.gray)
+                                    )
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text("No shows in this list yet")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .frame(height: 50)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .onAppear {
+            if let listId = list.id {
+                Task {
+                    await loadListShows(listId: listId)
+                }
+            }
+        }
+    }
+    
+    private func loadListShows(listId: String) async {
+        isLoading = true
+        
+        do {
+            listShows = try await ListService.shared.getShowsInList(listId: listId)
+        } catch {
+            print("Error loading shows for list \(listId): \(error)")
+        }
+        
+        isLoading = false
+    }
+}
+
+struct CreateListView: View {
+    @Environment(\.presentationMode) var presentationMode
+    @EnvironmentObject private var authManager: AuthManager
+    
+    @State private var listName: String = ""
+    @State private var listDescription: String = ""
+    @State private var isPrivate: Bool = false
+    @State private var isCreating = false
+    @State private var errorMessage: String?
+    
+    var onListCreated: (ShowList) -> Void
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("List Details")) {
+                    TextField("List Name", text: $listName)
+                    
+                    TextField("Description", text: $listDescription)
+                        .frame(height: 80)
+                    
+                    Toggle("Private List", isOn: $isPrivate)
+                }
+                
+                if let error = errorMessage {
+                    Section {
+                        Text(error)
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            .navigationTitle("Create New List")
+            .navigationBarItems(
+                leading: Button("Cancel") {
+                    presentationMode.wrappedValue.dismiss()
+                },
+                trailing: Button(action: createList) {
+                    if isCreating {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                    } else {
+                        Text("Create")
+                            .bold()
+                    }
+                }
+                .disabled(isCreating || listName.isEmpty)
+            )
+        }
+    }
+    
+    private func createList() {
+        guard let userId = authManager.currentUser?.uid else {
+            errorMessage = "You must be signed in to create a list"
+            return
+        }
+        
+        isCreating = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                let listId = try await ListService.shared.createList(
+                    name: listName,
+                    description: listDescription,
+                    isPrivate: isPrivate,
+                    userId: userId
+                )
+                
+                if let newList = try? await ListService.shared.getList(id: listId) {
+                    await MainActor.run {
+                        onListCreated(newList)
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            } catch {
+                errorMessage = "Failed to create list: \(error.localizedDescription)"
+                print("Error creating list: \(error)")
+            }
+            
+            await MainActor.run {
+                isCreating = false
+            }
+        }
+    }
+}
+
+struct ListDetailView: View {
+    @State private var list: ShowList
+    @State private var shows: [FirestoreShow] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var isEditMode = false
+    @State private var selectedShows: Set<String> = []
+    @State private var showingPrivacyConfirmation = false
+    @State private var showingDeleteConfirmation = false
+    @EnvironmentObject private var authManager: AuthManager
+    
+    init(list: ShowList) {
+        _list = State(initialValue: list)
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // List header
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(list.name)
+                        .font(.title)
+                        .fontWeight(.bold)
+                    
+                    Text(list.description)
+                        .foregroundColor(.gray)
+                        .padding(.bottom, 4)
+                    
+                    HStack {
+                        if list.isPrivate {
+                            Label("Private", systemImage: "lock.fill")
+                                .font(.caption)
+                        } else {
+                            Label("Public", systemImage: "globe")
+                                .font(.caption)
+                        }
+                        
+                        Spacer()
+                        
+                        Text("Created \(list.formattedDate)")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                }
+                .padding()
+                
+                if isLoading {
+                    ProgressView("Loading shows...")
+                        .frame(maxWidth: .infinity, minHeight: 200)
+                } else if let error = errorMessage {
+                    VStack {
+                        Text("Error loading shows")
+                            .font(.headline)
+                            .foregroundColor(.red)
+                        
+                        Text(error)
+                            .foregroundColor(.gray)
+                        
+                        Button("Try Again") {
+                            loadShows()
+                        }
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                } else if shows.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "tv")
+                            .font(.system(size: 50))
+                            .foregroundColor(.gray)
+                        
+                        Text("No shows in this list yet")
+                            .font(.headline)
+                        
+                        Text("Add shows to this list by tapping the bookmark icon on a show's detail page.")
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.gray)
+                            .padding()
+                    }
+                    .padding(.vertical, 50)
+                    .frame(maxWidth: .infinity)
+                } else {
+                    // Shows in list
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 20) {
+                        ForEach(shows) { show in
+                            if isEditMode {
+                                ShowEditItemView(
+                                    show: show,
+                                    isSelected: selectedShows.contains(show.id ?? ""),
+                                    onToggle: { toggleShowSelection(show) }
+                                )
+                            } else {
+                                NavigationLink(destination: FirestoreShowDetailView(firestoreShow: show)) {
+                                    ShowGridItemView(show: show)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        }
+        .navigationBarTitle("", displayMode: .inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if isEditMode {
+                    Button(action: {
+                        isEditMode = false
+                        selectedShows.removeAll()
+                    }) {
+                        Text("Done")
+                    }
+                } else {
+                    Menu {
+                        Button(action: {
+                            isEditMode = true
+                        }) {
+                            Label("Edit Shows", systemImage: "pencil")
+                        }
+                        
+                        Button(action: {
+                            showingPrivacyConfirmation = true
+                        }) {
+                            Label(list.isPrivate ? "Make Public" : "Make Private", 
+                                  systemImage: list.isPrivate ? "globe" : "lock")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+            }
+        }
+        .overlay(
+            VStack {
+                Spacer()
+                
+                if isEditMode && !selectedShows.isEmpty {
+                    HStack {
+                        Button(action: {
+                            showingDeleteConfirmation = true
+                        }) {
+                            Text("Remove \(selectedShows.count) show\(selectedShows.count > 1 ? "s" : "")")
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.red)
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                        }
+                    }
+                    .padding()
+                    .background(Color(UIColor.systemBackground))
+                    .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: -2)
+                }
+            }
+        )
+        .confirmationDialog(
+            "Change Privacy Setting",
+            isPresented: $showingPrivacyConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(list.isPrivate ? "Make Public" : "Make Private", role: .none) {
+                toggleListPrivacy()
+            }
+            
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(list.isPrivate 
+                ? "Making this list public will allow other users to see it."
+                : "Making this list private will hide it from other users.")
+        }
+        .confirmationDialog(
+            "Remove Shows",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                removeSelectedShows()
+            }
+            
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to remove the selected shows from this list?")
+        }
+        .task {
+            await fetchShowsData(listId: list.id ?? "")
+        }
+    }
+    
+    private func loadShows() {
+        guard let listId = list.id else {
+            errorMessage = "Invalid list ID"
+            isLoading = false
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            await fetchShowsData(listId: listId)
+        }
+    }
+    
+    private func fetchShowsData(listId: String) async {
+        do {
+            let loadedShows = try await ListService.shared.getShowsInList(listId: listId)
+            
+            // Also refresh the list details
+            let updatedList = try? await ListService.shared.getList(id: listId)
+            
+            await MainActor.run {
+                shows = loadedShows
+                if let updatedList = updatedList {
+                    list = updatedList
+                }
+                isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isLoading = false
+                print("Error loading shows: \(error)")
+            }
+        }
+    }
+    
+    private func toggleShowSelection(_ show: FirestoreShow) {
+        guard let showId = show.id else { return }
+        
+        if selectedShows.contains(showId) {
+            selectedShows.remove(showId)
+        } else {
+            selectedShows.insert(showId)
+        }
+    }
+    
+    private func removeSelectedShows() {
+        guard let listId = list.id else { return }
+        
+        // Capture the selected shows for removal
+        let showsToRemove = selectedShows
+        
+        // Set to edit mode immediately for UI feedback
+        isEditMode = true
+        
+        Task {
+            do {
+                // Update the list with the filtered show IDs
+                // Create a filtered list of shows that excludes the ones to be removed
+                let filteredShowIds = list.showIds.filter { showId in
+                    !showsToRemove.contains(showId)
+                }
+                
+                // Update the list with the filtered show IDs
+                try await updateShowIdsInList(listId: listId, showIds: filteredShowIds)
+                
+                // Clear selection and reload the shows list
+                await MainActor.run {
+                    selectedShows.removeAll()
+                }
+                
+                // Load the fresh data
+                await fetchShowsData(listId: listId)
+                
+                // Exit edit mode once complete
+                await MainActor.run {
+                    isEditMode = false
+                }
+            } catch {
+                print("Error removing shows: \(error)")
+                
+                await MainActor.run {
+                    isEditMode = false
+                }
+            }
+        }
+    }
+    
+    private func updateShowIdsInList(listId: String, showIds: [String]) async throws {
+        // Get a reference to the list document
+        let listRef = Firestore.firestore().collection("lists").document(listId)
+        
+        // Update the showIds field with the new array
+        try await listRef.updateData([
+            "showIds": showIds
+        ])
+    }
+    
+    private func toggleListPrivacy() {
+        guard let listId = list.id else { return }
+        
+        // Toggle local state first for immediate UI feedback
+        list.isPrivate.toggle()
+        
+        Task {
+            do {
+                // Update Firestore
+                try await ListService.shared.updateListPrivacy(listId: listId, isPrivate: list.isPrivate)
+            } catch {
+                // Revert on error
+                await MainActor.run {
+                    list.isPrivate.toggle() // Revert back on error
+                    print("Error updating list privacy: \(error)")
+                }
+            }
+        }
+    }
+}
+
+struct ShowEditItemView: View {
+    let show: FirestoreShow
+    let isSelected: Bool
+    let onToggle: () -> Void
+    
+    var body: some View {
+        Button(action: onToggle) {
+            ZStack(alignment: .topTrailing) {
+                ShowGridItemView(show: show)
+                    .opacity(isSelected ? 0.7 : 1.0)
+                
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 24))
+                    .foregroundColor(isSelected ? .blue : .gray)
+                    .background(Circle().fill(Color.white))
+                    .padding(8)
+            }
+        }
+    }
+}
+
+struct ShowGridItemView: View {
+    let show: FirestoreShow
+    
+    var body: some View {
+        VStack(alignment: .leading) {
+            // Poster image
+            if let posterURL = show.posterURL {
+                AsyncImage(url: posterURL) { phase in
+                    switch phase {
+                    case .empty:
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .aspectRatio(2/3, contentMode: .fit)
+                            .cornerRadius(8)
+                            .overlay(ProgressView())
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(height: 200)
+                            .cornerRadius(8)
+                            .clipped()
+                    case .failure:
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .aspectRatio(2/3, contentMode: .fit)
+                            .cornerRadius(8)
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .foregroundColor(.gray)
+                            )
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+                .frame(height: 200)
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .aspectRatio(2/3, contentMode: .fit)
+                    .frame(height: 200)
+                    .cornerRadius(8)
+                    .overlay(
+                        Image(systemName: "photo")
+                            .foregroundColor(.gray)
+                    )
+            }
+            
+            // Show title
+            Text(show.name)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .lineLimit(2)
+            
+            // Release year
+            Text(show.releaseYear)
+                .font(.caption)
+                .foregroundColor(.gray)
+        }
+    }
+}
+
+#Preview {
+    UserListsView()
+        .environmentObject(AuthManager())
+} 
