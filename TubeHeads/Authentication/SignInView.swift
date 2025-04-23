@@ -16,7 +16,18 @@ final class SignInViewModel: ObservableObject {
         }
         
         do {
+            // Sign in with auth manager
             try await authManager.signIn(email: email, password: password)
+            
+            // Refresh token after sign in to ensure valid token
+            if Auth.auth().currentUser != nil {
+                print("SignInViewModel: Refreshing auth token after sign in")
+                try? await authManager.refreshAuthToken()
+            }
+            
+            // Debug auth state after signing in
+            authManager.debugAuthState()
+            
             return
         } catch {
             handleAuthError(error)
@@ -24,6 +35,8 @@ final class SignInViewModel: ObservableObject {
     }
     
     private func handleAuthError(_ error: Error) {
+        print("SignInViewModel: Auth error: \(error.localizedDescription)")
+        
         if let authError = error as? AuthErrorCode {
             switch authError.code {
             case .userNotFound:
@@ -47,6 +60,7 @@ struct SignInView: View {
     @EnvironmentObject private var authManager: AuthManager
     @Binding var showSignInView: Bool
     @State private var isLoading = false
+    @State private var firebaseError: String? = nil
     
     var body: some View {
         VStack(spacing: 20) {
@@ -73,34 +87,69 @@ struct SignInView: View {
                     .padding(.vertical, 5)
             }
             
+            if let error = firebaseError {
+                Text("Firebase error: \(error)")
+                    .foregroundColor(.red)
+                    .font(.caption)
+                    .padding(.vertical, 5)
+                    .onAppear {
+                        // Clear error after 5 seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                            firebaseError = nil
+                        }
+                    }
+            }
+            
             Button {
                 Task {
                     isLoading = true
-                    await viewModel.signIn(authManager: authManager)
-                    isLoading = false
-                    if !viewModel.showError {
-                        showSignInView = false
+                    
+                    // Debug auth state before signing in
+                    print("SignInView: Checking auth state before sign in")
+                    authManager.debugAuthState()
+                    
+                    do {
+                        await viewModel.signIn(authManager: authManager)
+                        
+                        // Check for any Firestore-related errors
+                        if Auth.auth().currentUser != nil {
+                            do {
+                                if let uid = Auth.auth().currentUser?.uid {
+                                    // Try to access user data to verify Firestore permissions
+                                    let _ = try await UserManager.shared.getUser(userId: uid)
+                                    print("SignInView: Successfully accessed Firestore after sign in")
+                                }
+                            } catch {
+                                firebaseError = "Firestore access error: \(error.localizedDescription)"
+                                print("SignInView: \(firebaseError!)")
+                            }
+                        }
+                        
+                        isLoading = false
+                        if !viewModel.showError {
+                            showSignInView = false
+                        }
+                    } catch {
+                        isLoading = false
+                        print("SignInView: Error during sign in process: \(error.localizedDescription)")
                     }
                 }
             } label: {
-                if isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .black))
-                        .frame(height: 55)
-                        .frame(maxWidth: .infinity)
-                        .background(Color(hex: "#f6bebe"))
-                        .cornerRadius(10)
-                        .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
-                } else {
-                    Text("Sign In")
-                        .font(.headline)
-                        .foregroundColor(.black)
-                        .frame(height: 55)
-                        .frame(maxWidth: .infinity)
-                        .background(Color(hex: "#f6bebe"))
-                        .cornerRadius(10)
-                        .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
+                Group {
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                    } else {
+                        Text("Sign In")
+                            .font(.headline)
+                            .foregroundColor(.black)
+                    }
                 }
+                .frame(height: 55)
+                .frame(maxWidth: .infinity)
+                .background(Color(hex: "#f6bebe"))
+                .cornerRadius(10)
+                .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
             }
             .disabled(isLoading)
             
