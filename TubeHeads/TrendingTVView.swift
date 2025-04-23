@@ -48,11 +48,19 @@ struct TrendingTVView: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 16) {
-                        ForEach(viewModel.tvShows) { show in
-                            NavigationLink(destination: ShowDetailView(tmdbId: show.id, initialTVShow: show)) {
+                        ForEach(Array(viewModel.tvShows.enumerated()), id: \.element.id) { index, show in
+                            NavigationLink(destination: 
+                                FirestoreShowDetailView(firestoreShow: FirestoreShow(
+                                    tmdbId: show.id,
+                                    name: show.name,
+                                    overview: show.overview,
+                                    posterPath: show.posterPath,
+                                    backdropPath: show.backdropPath,
+                                    firstAirDate: show.firstAirDate
+                                ))
+                            ) {
                                 TVShowCard(show: show)
                             }
-                            .buttonStyle(PlainButtonStyle())
                         }
                     }
                     .padding(.horizontal)

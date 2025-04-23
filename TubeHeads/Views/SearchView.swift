@@ -280,7 +280,16 @@ struct SearchView: View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 ForEach(viewModel.searchResults) { show in
-                    NavigationLink(destination: ShowDetailView(tmdbId: show.id, initialTVShow: show)) {
+                    NavigationLink(destination: 
+                        FirestoreShowDetailView(firestoreShow: FirestoreShow(
+                            tmdbId: show.id,
+                            name: show.name,
+                            overview: show.overview,
+                            posterPath: show.posterPath,
+                            backdropPath: show.backdropPath,
+                            firstAirDate: show.firstAirDate
+                        ))
+                    ) {
                         SearchResultRow(show: show)
                     }
                     .buttonStyle(PlainButtonStyle())
