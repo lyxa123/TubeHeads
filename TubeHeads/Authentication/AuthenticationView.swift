@@ -84,7 +84,8 @@ struct AuthenticationView: View {
         .padding()
         .onAppear {
             // Check auth state when view appears
-            authManager.debugAuthState()
+            // This method was removed during code cleanup
+            // authManager.debugAuthState()
         }
         .alert(isPresented: $showErrorAlert) {
             Alert(

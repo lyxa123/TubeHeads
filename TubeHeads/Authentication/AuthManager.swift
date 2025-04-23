@@ -17,6 +17,15 @@ class AuthManager: ObservableObject {
         }
     }
     
+    // Simple debug function to check authentication state
+    func debugAuthState() {
+        if Auth.auth().currentUser != nil {
+            print("User is signed in")
+        } else {
+            print("No user is currently signed in")
+        }
+    }
+    
     func createAccount(email: String, password: String, username: String) async throws {
         do {
             let authResult = try await AuthenticationManager.shared.createUser(email: email, password: password)

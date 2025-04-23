@@ -110,6 +110,7 @@ struct SideMenuView: View {
     @Binding var showMenu: Bool
     @Binding var showSignInView: Bool
     @State private var navigateToSettings = false
+    @State private var navigateToProfile = false
     var username: String
     
     var body: some View {
@@ -168,10 +169,15 @@ struct SideMenuView: View {
                     Spacer()
                         .frame(height: 40)
                     
-                    // Profile (non-functional)
+                    // Profile (functional)
                     Button {
                         withAnimation {
                             showMenu = false
+                        }
+                        
+                        // Navigate to profile after menu closes
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            navigateToProfile = true
                         }
                     } label: {
                         HStack {
@@ -308,6 +314,10 @@ struct SideMenuView: View {
                         .padding(.vertical, 12)
                         .foregroundColor(.blue)
                         .contentShape(Rectangle())
+                    }
+                    
+                    NavigationLink(destination: ProfileView().environmentObject(authManager), isActive: $navigateToProfile) {
+                        EmptyView()
                     }
                     
                     NavigationLink(destination: SettingsView(showSignInView: $showSignInView), isActive: $navigateToSettings) {

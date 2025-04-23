@@ -26,7 +26,7 @@ final class SignInViewModel: ObservableObject {
             }
             
             // Debug auth state after signing in
-            authManager.debugAuthState()
+            // authManager.debugAuthState()
             
             return
         } catch {
@@ -106,7 +106,7 @@ struct SignInView: View {
                     
                     // Debug auth state before signing in
                     print("SignInView: Checking auth state before sign in")
-                    authManager.debugAuthState()
+                    // authManager.debugAuthState()
                     
                     do {
                         await viewModel.signIn(authManager: authManager)
