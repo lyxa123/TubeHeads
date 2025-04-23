@@ -3,6 +3,9 @@ import SwiftUI
 struct AuthenticationView: View {
     @EnvironmentObject private var authManager: AuthManager
     @Binding var showSignInView: Bool
+    @State private var showFirebaseRulesSheet = false
+    @State private var showErrorAlert = false
+    @State private var errorMessage = "Missing or insufficient permissions. Check Firebase Rules."
     
     var body: some View {
         VStack(spacing: 30) {
@@ -59,8 +62,40 @@ struct AuthenticationView: View {
             }
             
             Spacer()
+            
+            // Firebase Rules button
+            Button {
+                showFirebaseRulesSheet = true
+            } label: {
+                HStack {
+                    Image(systemName: "lock.shield")
+                        .foregroundColor(.blue)
+                    
+                    Text("Firebase Rules Help")
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                }
+                .padding(.vertical, 8)
+            }
+            .sheet(isPresented: $showFirebaseRulesSheet) {
+                FirebaseRulesView()
+            }
         }
         .padding()
+        .onAppear {
+            // Check auth state when view appears
+            authManager.debugAuthState()
+        }
+        .alert(isPresented: $showErrorAlert) {
+            Alert(
+                title: Text("Permission Error"),
+                message: Text(errorMessage),
+                primaryButton: .default(Text("Show Rules")) {
+                    showFirebaseRulesSheet = true
+                },
+                secondaryButton: .cancel(Text("Dismiss"))
+            )
+        }
     }
 }
 
