@@ -162,7 +162,7 @@ struct SignUpView: View {
                 Task {
                     // Debug auth state before sign up
                     print("SignUpView: Checking auth state before sign up")
-                    authManager.debugAuthState()
+                    // authManager.debugAuthState()
                     
                     isLoading = true
                     do {
@@ -228,6 +228,8 @@ struct SignUpView: View {
             viewModel.showError = false
             firebaseError = nil
             viewModel.verificationEmailSent = false
+            // Check initial auth state
+            // authManager.debugAuthState()
         }
     }
 } 
