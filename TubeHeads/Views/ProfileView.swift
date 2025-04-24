@@ -13,6 +13,8 @@ struct UserProfile: Codable {
     var hasProfileImage: Bool
     var profileImageBase64: String?
     var lastUpdated: Date
+    var isPublic: Bool
+    var watchedShows: [WatchedShow]
     
     enum CodingKeys: String, CodingKey {
         case userId
@@ -22,6 +24,25 @@ struct UserProfile: Codable {
         case hasProfileImage
         case profileImageBase64
         case lastUpdated
+        case isPublic
+        case watchedShows
+    }
+}
+
+// Model for watched shows
+struct WatchedShow: Codable, Identifiable {
+    var id: String
+    var title: String
+    var imageName: String?
+    var dateWatched: Date
+    var rating: Int? // Optional rating out of 5
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case imageName
+        case dateWatched
+        case rating
     }
 }
 
@@ -53,7 +74,7 @@ class ProfileManager {
     private init() { }
     
     // Save or update user profile data
-    func saveProfile(userId: String, username: String, bio: String, location: String, profileImage: UIImage?) async throws {
+    func saveProfile(userId: String, username: String, bio: String, location: String, profileImage: UIImage?, isPublic: Bool = true) async throws {
         let hasProfileImage = profileImage != nil
         var profileData: [String: Any] = [
             "userId": userId,
@@ -61,7 +82,8 @@ class ProfileManager {
             "bio": bio,
             "location": location,
             "hasProfileImage": hasProfileImage,
-            "lastUpdated": Timestamp(date: Date())
+            "lastUpdated": Timestamp(date: Date()),
+            "isPublic": isPublic
         ]
         
         // If there's a profile image, resize, compress, and convert to base64
@@ -111,7 +133,9 @@ class ProfileManager {
                 location: "",
                 hasProfileImage: false,
                 profileImageBase64: nil,
-                lastUpdated: Date()
+                lastUpdated: Date(),
+                isPublic: true,
+                watchedShows: []
             )
         }
         
@@ -129,6 +153,28 @@ class ProfileManager {
             imageCache[userId] = image
         }
         
+        // Parse watched shows list
+        var watchedShows: [WatchedShow] = []
+        if let watchedShowsData = data["watchedShows"] as? [[String: Any]] {
+            for showData in watchedShowsData {
+                if let id = showData["id"] as? String,
+                   let title = showData["title"] as? String {
+                    let dateWatched = (showData["dateWatched"] as? Timestamp)?.dateValue() ?? Date()
+                    let imageName = showData["imageName"] as? String
+                    let rating = showData["rating"] as? Int
+                    
+                    let show = WatchedShow(
+                        id: id,
+                        title: title,
+                        imageName: imageName,
+                        dateWatched: dateWatched,
+                        rating: rating
+                    )
+                    watchedShows.append(show)
+                }
+            }
+        }
+        
         return UserProfile(
             userId: data["userId"] as? String ?? userId,
             username: data["username"] as? String ?? "User",
@@ -136,7 +182,9 @@ class ProfileManager {
             location: data["location"] as? String ?? "",
             hasProfileImage: data["hasProfileImage"] as? Bool ?? false,
             profileImageBase64: profileImageBase64,
-            lastUpdated: (data["lastUpdated"] as? Timestamp)?.dateValue() ?? Date()
+            lastUpdated: (data["lastUpdated"] as? Timestamp)?.dateValue() ?? Date(),
+            isPublic: data["isPublic"] as? Bool ?? true,
+            watchedShows: watchedShows
         )
     }
     
@@ -166,6 +214,68 @@ class ProfileManager {
     func clearCache() {
         imageCache.removeAll()
     }
+    
+    // Add a show to the watched list
+    func addWatchedShow(userId: String, show: WatchedShow) async throws {
+        // Validate show data
+        let validShow = WatchedShow(
+            id: show.id,
+            title: show.title.isEmpty ? "Unknown Show" : show.title,
+            imageName: show.imageName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+            dateWatched: show.dateWatched,
+            rating: show.rating
+        )
+        
+        // Get the current profile
+        let profile = try await getProfile(userId: userId)
+        
+        // Remove existing show with the same ID if present
+        var updatedWatchedShows = profile.watchedShows.filter { $0.id != validShow.id }
+        
+        // Add the new show
+        updatedWatchedShows.append(validShow)
+        
+        // Prepare safe data for Firestore
+        let watchedShowsData = updatedWatchedShows.map { show in
+            return [
+                "id": show.id,
+                "title": show.title,
+                "imageName": show.imageName ?? "",
+                "dateWatched": Timestamp(date: show.dateWatched),
+                "rating": show.rating ?? 0
+            ]
+        }
+        
+        // Update the watched shows in Firestore
+        try await profileCollection.document(userId).updateData([
+            "watchedShows": watchedShowsData
+        ])
+    }
+    
+    // Remove a show from the watched list
+    func removeWatchedShow(userId: String, showId: String) async throws {
+        // Get the current profile
+        let profile = try await getProfile(userId: userId)
+        
+        // Filter out the show with the given ID
+        let updatedWatchedShows = profile.watchedShows.filter { $0.id != showId }
+        
+        // Prepare safe data for Firestore
+        let watchedShowsData = updatedWatchedShows.map { show in
+            return [
+                "id": show.id,
+                "title": show.title,
+                "imageName": show.imageName ?? "",
+                "dateWatched": Timestamp(date: show.dateWatched),
+                "rating": show.rating ?? 0
+            ]
+        }
+        
+        // Update the watched shows in Firestore
+        try await profileCollection.document(userId).updateData([
+            "watchedShows": watchedShowsData
+        ])
+    }
 }
 
 struct ProfileView: View {
@@ -181,15 +291,10 @@ struct ProfileView: View {
     @State private var isLoading: Bool = false
     @State private var isImageLoading: Bool = false
     @State private var errorMessage: String? = nil
+    @State private var isPublic: Bool = true
+    @State private var watchedShows: [WatchedShow] = []
     @Environment(\.presentationMode) var presentationMode
     @Environment(\.scenePhase) var scenePhase
-    
-    // Recent activity shows will be displayed in a horizontal scroll
-    let recentShows: [ShowPreview] = [
-        ShowPreview(imageName: "whiteLotus", title: "The White Lotus"),
-        ShowPreview(imageName: "cassandra", title: "Cassandra"),
-        ShowPreview(imageName: "severance", title: "Severance")
-    ]
     
     var body: some View {
         Group {
@@ -241,9 +346,9 @@ struct ProfileView: View {
                     username: username,
                     bio: bio,
                     location: location,
-                    profileImage: profileImage,
-                    onSave: { newBio, newLocation, newImage in
-                        saveUserProfile(bio: newBio, location: newLocation, image: newImage)
+                    isPublic: isPublic, profileImage: profileImage,
+                    onSave: { newBio, newLocation, newImage, newIsPublic in
+                        saveUserProfile(bio: newBio, location: newLocation, image: newImage, isPublic: newIsPublic)
                     }
                 )
             }
@@ -287,9 +392,10 @@ struct ProfileView: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     
-                    Image(systemName: "lock.fill")
+                    // Show appropriate icon based on privacy status
+                    Image(systemName: isPublic ? "lock.open.fill" : "lock.fill")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(isPublic ? .green : .red)
                 }
                 .padding(.horizontal)
                 
@@ -360,17 +466,17 @@ struct ProfileView: View {
                 Divider()
                     .padding(.horizontal)
                 
-                // Recent Activity section
+                // Watched Shows section
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("Recent Activity")
+                        Text("Watched Shows")
                             .font(.headline)
                             .fontWeight(.semibold)
                         
                         Spacer()
                         
                         Button(action: {
-                            // More action
+                            // View all watched shows
                         }) {
                             Text("See All")
                                 .font(.subheadline)
@@ -380,16 +486,18 @@ struct ProfileView: View {
                     .padding(.horizontal)
                     .padding(.top, 8)
                     
-                    // Show thumbnails
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(recentShows) { show in
-                                ShowThumbnail(show: show)
-                            }
+                    if watchedShows.isEmpty {
+                        Text("No watched shows yet")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding()
+                    } else {
+                        ScrollView {
+                            WatchedShowsList(shows: watchedShows)
                         }
-                        .padding(.horizontal)
+                        .frame(height: min(250, CGFloat(watchedShows.count * 60)))
                     }
-                    .frame(height: 130)
                 }
                 .padding(.vertical, 8)
                 
@@ -409,7 +517,7 @@ struct ProfileView: View {
         Task {
             do {
                 // Get username from AuthManager
-            if let username = await authManager.getCurrentUsername() {
+                if let username = await authManager.getCurrentUsername() {
                     self.username = username
                 }
                 
@@ -442,6 +550,8 @@ struct ProfileView: View {
                 await MainActor.run {
                     self.bio = profile.bio
                     self.location = profile.location
+                    self.isPublic = profile.isPublic
+                    self.watchedShows = profile.watchedShows
                     self.isLoading = false
                 }
             } catch {
@@ -454,7 +564,7 @@ struct ProfileView: View {
         }
     }
     
-    private func saveUserProfile(bio: String, location: String, image: UIImage?) {
+    private func saveUserProfile(bio: String, location: String, image: UIImage?, isPublic: Bool) {
         guard let userId = authManager.currentUser?.uid else { return }
         
         isLoading = true
@@ -466,6 +576,7 @@ struct ProfileView: View {
                 await MainActor.run {
                     self.bio = bio
                     self.location = location
+                    self.isPublic = isPublic
                     if let img = image {
                         self.profileImage = img
                     }
@@ -477,7 +588,8 @@ struct ProfileView: View {
                     username: username,
                     bio: bio,
                     location: location,
-                    profileImage: image
+                    profileImage: image,
+                    isPublic: isPublic
                 )
                 
                 await MainActor.run {
@@ -509,6 +621,7 @@ struct EditProfileView: View {
     @State private var isSaving = false
     @State private var showCountryPicker = false
     @State private var showSizeWarning = false
+    @State var isPublic: Bool
     @FocusState private var isLocationFocused: Bool
     
     // Initial profile image passed from ProfileView
@@ -525,7 +638,7 @@ struct EditProfileView: View {
         "Malaysia", "Indonesia", "Philippines", "Vietnam"
     ].sorted()
     
-    var onSave: (String, String, UIImage?) -> Void
+    var onSave: (String, String, UIImage?, Bool) -> Void
     
     var body: some View {
         ScrollView {
@@ -619,6 +732,33 @@ struct EditProfileView: View {
                             .cornerRadius(8)
                         }
                     }
+                    
+                    // Privacy toggle
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Profile Privacy")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            Toggle(isOn: $isPublic) {
+                                HStack {
+                                    Image(systemName: isPublic ? "lock.open.fill" : "lock.fill")
+                                        .foregroundColor(isPublic ? .green : .red)
+                                    
+                                    Text(isPublic ? "Public Profile" : "Private Profile")
+                                        .font(.subheadline)
+                                }
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                            
+                            Text(isPublic ? "Anyone can view your profile" : "Only followers can view your profile")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal)
+                        }
+                    }
                 }
                 .padding(.horizontal)
             }
@@ -699,7 +839,7 @@ struct EditProfileView: View {
         isSaving = true
         
         // Save the profile via the callback
-        onSave(bio, location, selectedPhoto ?? profileImage)
+        onSave(bio, location, selectedPhoto ?? profileImage, isPublic)
         
         isSaving = false
         dismiss()
@@ -730,40 +870,294 @@ struct ProfileImage: View {
     }
 }
 
-struct ShowPreview: Identifiable {
-    let id = UUID()
-    let imageName: String
-    let title: String
+// Watched Shows List Component - Changed to vertical list
+struct WatchedShowsList: View {
+    let shows: [WatchedShow]
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            ForEach(shows) { show in
+                WatchedShowRow(show: show)
+            }
+        }
+        .padding(.horizontal)
+    }
 }
 
-struct ShowThumbnail: View {
-    let show: ShowPreview
+// Individual Watched Show Row - Simplified from card to row
+struct WatchedShowRow: View {
+    let show: WatchedShow
+    
+    var body: some View {
+        NavigationLink(destination: FirestoreShowDetailViewWrapper(showId: show.id, showTitle: show.title)) {
+            HStack {
+                // Show thumbnail 
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 60, height: 60)
+                    
+                    if let imageName = show.imageName, !imageName.isEmpty, imageName != " " {
+                        AsyncImage(url: URL(string: "https://image.tmdb.org/t/p/w200\(imageName)")) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                                    .frame(width: 60, height: 60)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 60, height: 60)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                            case .failure:
+                                Image(systemName: "tv")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.gray)
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
+                    } else {
+                        Image(systemName: "tv")
+                            .font(.system(size: 24))
+                            .foregroundColor(.gray)
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    // Show title
+                    Text(show.title)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                    
+                    // Show watched date
+                    Text("Watched on \(formattedDate(show.dateWatched))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    // Rating if available
+                    if let rating = show.rating, rating > 0 {
+                        HStack(spacing: 2) {
+                            ForEach(1...5, id: \.self) { star in
+                                Image(systemName: star <= rating ? "star.fill" : "star")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(star <= rating ? .yellow : .gray.opacity(0.5))
+                            }
+                        }
+                    }
+                }
+                .padding(.leading, 8)
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            .padding(10)
+            .background(Color(.systemGray6))
+            .cornerRadius(10)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
+    }
+}
+
+// Wrapper to navigate to FirestoreShowDetailView from a watched show
+struct FirestoreShowDetailViewWrapper: View {
+    let showId: String
+    let showTitle: String
+    @State private var show: FirestoreShow?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    
+    var body: some View {
+        ZStack {
+            if isLoading {
+                ProgressView()
+                    .scaleEffect(1.5)
+            } else if let firestoreShow = show {
+                FirestoreShowDetailView(firestoreShow: firestoreShow)
+            } else if let error = errorMessage {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundColor(.orange)
+                    
+                    Text("Failed to load show details")
+                        .font(.headline)
+                    
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+            }
+        }
+        .navigationTitle(showTitle)
+        .task {
+            await loadShowDetails()
+        }
+    }
+    
+    private func loadShowDetails() async {
+        isLoading = true
+        
+        do {
+            // First try to load by Firestore ID
+            if let firestoreShow = try? await FirestoreShowService.shared.getShow(id: showId) {
+                show = firestoreShow
+                isLoading = false
+                return
+            }
+            
+            // If not found, show error
+            errorMessage = "Show with ID \(showId) not found"
+            isLoading = false
+        }
+    }
+}
+
+// Watch Button Component for Show Detail Pages
+struct WatchButton: View {
+    @State private var isWatched: Bool = false
+    @State private var showRatingView: Bool = false
+    @State private var rating: Int = 0
+    
+    let showId: String
+    let showTitle: String
+    let showImage: String?
+    let userId: String?
     
     var body: some View {
         VStack {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(width: 100, height: 130)
-                
-                // Fallback to a placeholder if the image doesn't exist
-                if UIImage(named: show.imageName) != nil {
-                    Image(show.imageName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 100, height: 130)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+            Button(action: {
+                if isWatched {
+                    // If already watched, show rating option
+                    showRatingView = true
                 } else {
-                    VStack {
-                        Image(systemName: "tv")
-                            .font(.largeTitle)
-                        Text(show.title)
-                            .font(.caption)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 4)
-                    }
-                    .frame(width: 100, height: 130)
+                    // Mark as watched
+                    markAsWatched()
                 }
+            }) {
+                HStack {
+                    Image(systemName: isWatched ? "checkmark.circle.fill" : "circle")
+                        .foregroundColor(isWatched ? .green : .primary)
+                    
+                    Text(isWatched ? "Watched" : "Mark as Watched")
+                        .fontWeight(.medium)
+                }
+                .padding(.vertical, 10)
+                .padding(.horizontal, 16)
+                .background(isWatched ? Color.green.opacity(0.2) : Color(.systemGray6))
+                .cornerRadius(8)
+            }
+            
+            if showRatingView {
+                VStack(spacing: 8) {
+                    Text("Rate this show:")
+                        .font(.subheadline)
+                    
+                    HStack {
+                        ForEach(1...5, id: \.self) { star in
+                            Image(systemName: star <= rating ? "star.fill" : "star")
+                                .font(.system(size: 24))
+                                .foregroundColor(star <= rating ? .yellow : .gray)
+                                .onTapGesture {
+                                    rating = star
+                                    saveRating()
+                                }
+                        }
+                    }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
+                .transition(.scale)
+            }
+        }
+        .onAppear {
+            checkIfWatched()
+        }
+    }
+    
+    private func checkIfWatched() {
+        guard let userId = userId else { return }
+        
+        Task {
+            do {
+                let profile = try await ProfileManager.shared.getProfile(userId: userId)
+                
+                // Check if this show is in the watched list
+                if let watchedShow = profile.watchedShows.first(where: { $0.id == showId }) {
+                    await MainActor.run {
+                        isWatched = true
+                        rating = watchedShow.rating ?? 0
+                    }
+                }
+            } catch {
+                print("Error checking if show is watched: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func markAsWatched() {
+        guard let userId = userId, !showId.isEmpty else { return }
+        
+        let newWatchedShow = WatchedShow(
+            id: showId,
+            title: showTitle,
+            imageName: showImage ?? "",
+            dateWatched: Date(),
+            rating: nil
+        )
+        
+        Task {
+            do {
+                try await ProfileManager.shared.addWatchedShow(userId: userId, show: newWatchedShow)
+                
+                await MainActor.run {
+                    isWatched = true
+                    showRatingView = true
+                }
+            } catch {
+                print("Error marking show as watched: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func saveRating() {
+        guard let userId = userId, !showId.isEmpty else { return }
+        
+        let updatedShow = WatchedShow(
+            id: showId,
+            title: showTitle,
+            imageName: showImage ?? "",
+            dateWatched: Date(),
+            rating: rating > 0 ? rating : nil
+        )
+        
+        Task {
+            do {
+                try await ProfileManager.shared.addWatchedShow(userId: userId, show: updatedShow)
+                
+                await MainActor.run {
+                    // Hide rating view after a short delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        withAnimation {
+                            showRatingView = false
+                        }
+                    }
+                }
+            } catch {
+                print("Error saving rating: \(error.localizedDescription)")
             }
         }
     }

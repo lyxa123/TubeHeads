@@ -12,6 +12,9 @@ struct FirestoreShowDetailView: View {
     @State private var showAddToListSheet = false
     @State private var userLists: [ShowList] = []
     @State private var isLoadingLists = false
+    @State private var isWatched: Bool = false
+    @State private var isMarkingWatched: Bool = false
+    @State private var showRatingDialog: Bool = false
     
     @EnvironmentObject private var authManager: AuthManager
     
@@ -94,6 +97,44 @@ struct FirestoreShowDetailView: View {
                                     Image(systemName: "bookmark")
                                         .font(.system(size: 22))
                                     Text("Watchlist")
+                                        .font(.caption)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .foregroundColor(.gray)
+                            }
+                        }
+                        
+                        // Watched button
+                        if authManager.isSignedIn {
+                            Button(action: {
+                                if let showId = firestoreShow.id, let userId = authManager.currentUser?.uid {
+                                    toggleWatchedStatus(showId: showId, userId: userId)
+                                }
+                            }) {
+                                VStack {
+                                    if isMarkingWatched {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle())
+                                            .font(.system(size: 22))
+                                    } else {
+                                        Image(systemName: isWatched ? "checkmark.circle.fill" : "circle")
+                                            .font(.system(size: 22))
+                                            .foregroundColor(isWatched ? .green : nil)
+                                    }
+                                    Text("Watched")
+                                        .font(.caption)
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .disabled(isMarkingWatched)
+                        } else {
+                            Button(action: {
+                                // Sign in prompt
+                            }) {
+                                VStack {
+                                    Image(systemName: "circle")
+                                        .font(.system(size: 22))
+                                    Text("Watched")
                                         .font(.caption)
                                 }
                                 .frame(maxWidth: .infinity)
@@ -225,6 +266,18 @@ struct FirestoreShowDetailView: View {
             )
             .environmentObject(authManager)
         }
+        .sheet(isPresented: $showRatingDialog) {
+            // Hide dialog and update rating
+            showRatingDialog = false
+        } content: {
+            RateWatchedShowView(
+                showName: firestoreShow.name,
+                initialRating: Int(userRating),
+                onSubmit: { rating in
+                    submitWatchedShowRating(rating: rating)
+                }
+            )
+        }
         .task {
             await loadShowDetails()
         }
@@ -279,6 +332,10 @@ struct FirestoreShowDetailView: View {
                 // Check if show is in user's watchlist
                 if let showId = firestoreShow.id {
                     isInWatchlist = try await WatchlistService.shared.isInWatchlist(userId: userId, showId: showId)
+                    
+                    // Check if show is in user's watched list
+                    let profile = try await ProfileManager.shared.getProfile(userId: userId)
+                    isWatched = profile.watchedShows.contains(where: { $0.id == showId })
                 }
             }
         } catch {
@@ -346,6 +403,81 @@ struct FirestoreShowDetailView: View {
             }
             
             isAddingToWatchlist = false
+        }
+    }
+    
+    private func toggleWatchedStatus(showId: String, userId: String) {
+        isMarkingWatched = true
+        
+        Task {
+            do {
+                let profile = try await ProfileManager.shared.getProfile(userId: userId)
+                
+                if isWatched {
+                    // Remove from watched list
+                    try await ProfileManager.shared.removeWatchedShow(userId: userId, showId: showId)
+                    await MainActor.run {
+                        isWatched = false
+                    }
+                } else {
+                    // Add to watched list
+                    let watchedShow = WatchedShow(
+                        id: showId,
+                        title: firestoreShow.name,
+                        imageName: firestoreShow.posterPath ?? "",
+                        dateWatched: Date(),
+                        rating: Int(userRating) > 0 ? Int(userRating) : nil
+                    )
+                    
+                    try await ProfileManager.shared.addWatchedShow(userId: userId, show: watchedShow)
+                    await MainActor.run {
+                        isWatched = true
+                        showRatingDialog = true
+                    }
+                }
+            } catch {
+                print("Error toggling watched status: \(error.localizedDescription)")
+            }
+            
+            await MainActor.run {
+                isMarkingWatched = false
+            }
+        }
+    }
+    
+    private func submitWatchedShowRating(rating: Int) {
+        guard let showId = firestoreShow.id,
+              let userId = authManager.currentUser?.uid else {
+            return
+        }
+        
+        Task {
+            do {
+                // Update show rating in Firestore
+                try await FirestoreShowService.shared.rateShow(
+                    showId: showId,
+                    userId: userId,
+                    rating: Double(rating)
+                )
+                
+                // Update the watched show record with the rating
+                let watchedShow = WatchedShow(
+                    id: showId,
+                    title: firestoreShow.name,
+                    imageName: firestoreShow.posterPath,
+                    dateWatched: Date(),
+                    rating: rating
+                )
+                
+                try await ProfileManager.shared.addWatchedShow(userId: userId, show: watchedShow)
+                
+                // Update local state
+                await MainActor.run {
+                    userRating = Double(rating)
+                }
+            } catch {
+                print("Error submitting watched show rating: \(error)")
+            }
         }
     }
 }
@@ -719,6 +851,75 @@ struct AddToListView: View {
                 showStatusMessage = false
             }
         }
+    }
+}
+
+// Rating view for watched shows
+struct RateWatchedShowView: View {
+    let showName: String
+    let initialRating: Int
+    let onSubmit: (Int) -> Void
+    
+    @State private var selectedRating: Int
+    @Environment(\.dismiss) private var dismiss
+    
+    init(showName: String, initialRating: Int = 0, onSubmit: @escaping (Int) -> Void) {
+        self.showName = showName
+        self.initialRating = initialRating
+        self.onSubmit = onSubmit
+        self._selectedRating = State(initialValue: initialRating)
+    }
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("You've watched \(showName)!")
+                .font(.title2)
+                .fontWeight(.bold)
+                .multilineTextAlignment(.center)
+                .padding(.top)
+            
+            Text("How would you rate it?")
+                .font(.headline)
+            
+            // Star rating
+            HStack(spacing: 12) {
+                ForEach(1...5, id: \.self) { star in
+                    Image(systemName: star <= selectedRating ? "star.fill" : "star")
+                        .font(.system(size: 30))
+                        .foregroundColor(star <= selectedRating ? .yellow : .gray)
+                        .onTapGesture {
+                            selectedRating = star
+                        }
+                }
+            }
+            .padding()
+            
+            // Submit button
+            Button(action: {
+                onSubmit(selectedRating)
+                dismiss()
+            }) {
+                Text("Submit Rating")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.blue)
+                    .cornerRadius(10)
+            }
+            .padding(.horizontal)
+            
+            // Skip button
+            Button("Skip Rating") {
+                dismiss()
+            }
+            .padding(.bottom)
+        }
+        .padding()
+        .frame(width: 300, height: 300)
+        .background(Color(.systemBackground))
+        .cornerRadius(20)
+        .shadow(radius: 10)
     }
 }
 
