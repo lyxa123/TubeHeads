@@ -57,11 +57,9 @@ final class SignUpViewModel: ObservableObject {
             try await authManager.createAccount(email: email, password: password, username: username)
             
             // Send email verification
-            if let user = Auth.auth().currentUser {
-                try await user.sendEmailVerification()
-                print("SignUpViewModel: Verification email sent to \(email)")
-                verificationEmailSent = true
-            }
+            try await authManager.sendEmailVerification()
+            print("SignUpViewModel: Verification email sent to \(email)")
+            verificationEmailSent = true
             
             // Refresh token to ensure valid token
             print("SignUpViewModel: Refreshing auth token after signup")
