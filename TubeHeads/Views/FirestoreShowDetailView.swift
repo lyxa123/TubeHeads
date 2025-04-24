@@ -6,7 +6,6 @@ struct FirestoreShowDetailView: View {
     
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var userRating: Double = 0
     @State private var isInWatchlist = false
     @State private var isAddingToWatchlist = false
     @State private var showAddToListSheet = false
@@ -14,7 +13,8 @@ struct FirestoreShowDetailView: View {
     @State private var isLoadingLists = false
     @State private var isWatched: Bool = false
     @State private var isMarkingWatched: Bool = false
-    @State private var showRatingDialog: Bool = false
+    @State private var showRateSheet = false
+    @State private var userRating: Double? = nil
     
     @EnvironmentObject private var authManager: AuthManager
     
@@ -108,7 +108,9 @@ struct FirestoreShowDetailView: View {
                         if authManager.isSignedIn {
                             Button(action: {
                                 if let showId = firestoreShow.id, let userId = authManager.currentUser?.uid {
-                                    toggleWatchedStatus(showId: showId, userId: userId)
+                                    Task {
+                                        await toggleWatchedStatus(showId: showId, userId: userId)
+                                    }
                                 }
                             }) {
                                 VStack {
@@ -176,7 +178,7 @@ struct FirestoreShowDetailView: View {
                         // Rate button
                         if authManager.isSignedIn {
                             Button(action: {
-                                // Show rating modal or expand rating stars
+                                showRateSheet = true
                             }) {
                                 VStack {
                                     Image(systemName: "star")
@@ -185,6 +187,14 @@ struct FirestoreShowDetailView: View {
                                         .font(.caption)
                                 }
                                 .frame(maxWidth: .infinity)
+                            }
+                            .onChange(of: showRateSheet) { isPresented in
+                                if !isPresented {
+                                    // Refresh after dismissing the sheet
+                                    Task {
+                                        await refreshShowData()
+                                    }
+                                }
                             }
                         } else {
                             Button(action: {
@@ -224,21 +234,28 @@ struct FirestoreShowDetailView: View {
                             }
                         }
                         
-                        if authManager.isSignedIn {
-                            Text("Your Rating:")
-                                .font(.subheadline)
-                                .padding(.top, 4)
-                            
+                        if let rating = userRating {
                             HStack {
-                                ForEach(1...5, id: \.self) { star in
-                                    Image(systemName: star <= Int(userRating) ? "star.fill" : "star")
-                                        .foregroundColor(.yellow)
-                                        .onTapGesture {
-                                            userRating = Double(star)
-                                            submitRating()
-                                        }
+                                Text("Your rating:")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                HStack(spacing: 2) {
+                                    ForEach(1...5, id: \.self) { star in
+                                        Image(systemName: Double(star) <= rating ? "star.fill" : "star")
+                                            .font(.caption)
+                                            .foregroundColor(.yellow)
+                                    }
                                 }
                             }
+                            .padding(.top, 2)
+                        }
+                        
+                        if !authManager.isSignedIn {
+                            Text("Sign in to rate this show or write a review.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 4)
                         }
                     }
                     .padding(.vertical, 8)
@@ -259,8 +276,16 @@ struct FirestoreShowDetailView: View {
                     
                     // Reviews section
                     if let showId = firestoreShow.id {
-                        ReviewsView(showId: showId, showName: firestoreShow.name)
-                            .environmentObject(authManager)
+                        ReviewsView(
+                            showId: showId, 
+                            showName: firestoreShow.name,
+                            onReviewAdded: {
+                                Task {
+                                    await refreshShowData()
+                                }
+                            }
+                        )
+                        .environmentObject(authManager)
                     }
                 }
                 .padding(.horizontal)
@@ -276,17 +301,16 @@ struct FirestoreShowDetailView: View {
             )
             .environmentObject(authManager)
         }
-        .sheet(isPresented: $showRatingDialog) {
-            // Hide dialog and update rating
-            showRatingDialog = false
-        } content: {
-            RateWatchedShowView(
-                showName: firestoreShow.name,
-                initialRating: Int(userRating),
-                onSubmit: { rating in
-                    submitWatchedShowRating(rating: rating)
+        .sheet(isPresented: $showRateSheet) {
+            RateShowView(
+                show: firestoreShow, 
+                userCurrentRating: userRating,
+                onRatingSubmitted: { newRating in
+                    // Update the UI without reloading
+                    userRating = newRating
                 }
             )
+            .environmentObject(authManager)
         }
         .task {
             await loadShowDetails()
@@ -333,27 +357,46 @@ struct FirestoreShowDetailView: View {
                 }
             }
             
-            // Now that we have a valid Firestore show with ID, continue with other operations
-            if let userId = authManager.currentUser?.uid {
-                if let userRatingValue = firestoreShow.userRatings[userId] {
-                    userRating = userRatingValue
-                }
-                
-                // Check if show is in user's watchlist
-                if let showId = firestoreShow.id {
-                    isInWatchlist = try await WatchlistService.shared.isInWatchlist(userId: userId, showId: showId)
-                    
-                    // Check if show is in user's watched list
-                    let profile = try await ProfileManager.shared.getProfile(userId: userId)
-                    isWatched = profile.watchedShows.contains(where: { $0.id == showId })
-                }
-            }
+            await refreshShowData()
         } catch {
             errorMessage = error.localizedDescription
             print("Error loading show details: \(error)")
         }
         
         isLoading = false
+    }
+    
+    private func refreshShowData() async {
+        // Now that we have a valid Firestore show with ID, continue with other operations
+        if let userId = authManager.currentUser?.uid {
+            // Check if show is in user's watchlist
+            if let showId = firestoreShow.id {
+                do {
+                    // Load fresh show data to get updated ratings
+                    let updatedShow = try await FirestoreShowService.shared.getShow(id: showId)
+                    
+                    // Update the show data
+                    await MainActor.run {
+                        firestoreShow = updatedShow
+                    }
+                    
+                    isInWatchlist = try await WatchlistService.shared.isInWatchlist(userId: userId, showId: showId)
+                    
+                    // Check if show is in user's watched list
+                    let profile = try await ProfileManager.shared.getProfile(userId: userId)
+                    isWatched = profile.watchedShows.contains(where: { $0.id == showId })
+                    
+                    // Get user's rating if available
+                    userRating = getUserRating(userId: userId)
+                } catch {
+                    print("Error refreshing show data: \(error)")
+                }
+            }
+        }
+    }
+    
+    private func getUserRating(userId: String) -> Double? {
+        return firestoreShow.userRatings[userId]
     }
     
     private func loadUserLists() async {
@@ -370,25 +413,6 @@ struct FirestoreShowDetailView: View {
         }
         
         isLoadingLists = false
-    }
-    
-    private func submitRating() {
-        guard let showId = firestoreShow.id,
-              let userId = authManager.currentUser?.uid else {
-            return
-        }
-        
-        Task {
-            do {
-                try await FirestoreShowService.shared.rateShow(
-                    showId: showId,
-                    userId: userId,
-                    rating: userRating
-                )
-            } catch {
-                print("Error submitting rating: \(error)")
-            }
-        }
     }
     
     private func toggleWatchlist() {
@@ -416,33 +440,36 @@ struct FirestoreShowDetailView: View {
         }
     }
     
-    private func toggleWatchedStatus(showId: String, userId: String) {
+    private func toggleWatchedStatus(showId: String, userId: String) async {
+        // Immediate UI feedback
         isMarkingWatched = true
         
         Task {
             do {
-                let profile = try await ProfileManager.shared.getProfile(userId: userId)
-                
                 if isWatched {
-                    // Remove from watched list
-                    try await ProfileManager.shared.removeWatchedShow(userId: userId, showId: showId)
+                    // Remove from watched shows
+                    let profile = try await ProfileManager.shared.getProfile(userId: userId)
+                    var updatedWatchedShows = profile.watchedShows.filter { $0.id != showId }
+                    
+                    try await ProfileManager.shared.updateWatchedShows(userId: userId, watchedShows: updatedWatchedShows)
                     await MainActor.run {
                         isWatched = false
                     }
                 } else {
-                    // Add to watched list
+                    // Add to watched shows
                     let watchedShow = WatchedShow(
                         id: showId,
                         title: firestoreShow.name,
                         imageName: firestoreShow.posterPath ?? "",
                         dateWatched: Date(),
-                        rating: Int(userRating) > 0 ? Int(userRating) : nil
+                        rating: nil
                     )
                     
                     try await ProfileManager.shared.addWatchedShow(userId: userId, show: watchedShow)
                     await MainActor.run {
                         isWatched = true
-                        showRatingDialog = true
+                        // Show rating sheet directly
+                        showRateSheet = true
                     }
                 }
             } catch {
@@ -451,42 +478,6 @@ struct FirestoreShowDetailView: View {
             
             await MainActor.run {
                 isMarkingWatched = false
-            }
-        }
-    }
-    
-    private func submitWatchedShowRating(rating: Int) {
-        guard let showId = firestoreShow.id,
-              let userId = authManager.currentUser?.uid else {
-            return
-        }
-        
-        Task {
-            do {
-                // Update show rating in Firestore
-                try await FirestoreShowService.shared.rateShow(
-                    showId: showId,
-                    userId: userId,
-                    rating: Double(rating)
-                )
-                
-                // Update the watched show record with the rating
-                let watchedShow = WatchedShow(
-                    id: showId,
-                    title: firestoreShow.name,
-                    imageName: firestoreShow.posterPath,
-                    dateWatched: Date(),
-                    rating: rating
-                )
-                
-                try await ProfileManager.shared.addWatchedShow(userId: userId, show: watchedShow)
-                
-                // Update local state
-                await MainActor.run {
-                    userRating = Double(rating)
-                }
-            } catch {
-                print("Error submitting watched show rating: \(error)")
             }
         }
     }
@@ -864,72 +855,132 @@ struct AddToListView: View {
     }
 }
 
-// Rating view for watched shows
-struct RateWatchedShowView: View {
-    let showName: String
-    let initialRating: Int
-    let onSubmit: (Int) -> Void
+// Simple rating view for rating without review
+struct RateShowView: View {
+    let show: FirestoreShow
+    let userCurrentRating: Double?
+    let onRatingSubmitted: (Double) -> Void
     
-    @State private var selectedRating: Int
+    @State private var rating: Double
+    @State private var isSubmitting = false
+    @State private var successMessage: String?
+    @State private var errorMessage: String?
+    
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var authManager: AuthManager
     
-    init(showName: String, initialRating: Int = 0, onSubmit: @escaping (Int) -> Void) {
-        self.showName = showName
-        self.initialRating = initialRating
-        self.onSubmit = onSubmit
-        self._selectedRating = State(initialValue: initialRating)
+    init(show: FirestoreShow, userCurrentRating: Double? = nil, onRatingSubmitted: @escaping (Double) -> Void = { _ in }) {
+        self.show = show
+        self.userCurrentRating = userCurrentRating
+        self.onRatingSubmitted = onRatingSubmitted
+        _rating = State(initialValue: userCurrentRating ?? 3.0)
     }
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text("You've watched \(showName)!")
-                .font(.title2)
-                .fontWeight(.bold)
-                .multilineTextAlignment(.center)
-                .padding(.top)
-            
-            Text("How would you rate it?")
-                .font(.headline)
-            
-            // Star rating
-            HStack(spacing: 12) {
-                ForEach(1...5, id: \.self) { star in
-                    Image(systemName: star <= selectedRating ? "star.fill" : "star")
-                        .font(.system(size: 30))
-                        .foregroundColor(star <= selectedRating ? .yellow : .gray)
-                        .onTapGesture {
-                            selectedRating = star
-                        }
+        NavigationView {
+            VStack(spacing: 20) {
+                Text(userCurrentRating != nil ? "Update Rating" : "Rate \(show.name)")
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                    .padding(.top)
+                
+                if userCurrentRating != nil {
+                    Text("You previously rated this \(String(format: "%.1f", userCurrentRating!)) stars")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
+                
+                // Star rating display
+                HStack(spacing: 12) {
+                    ForEach(1...5, id: \.self) { star in
+                        Image(systemName: star <= Int(rating) ? "star.fill" : "star")
+                            .font(.system(size: 36))
+                            .foregroundColor(.yellow)
+                            .onTapGesture {
+                                rating = Double(star)
+                            }
+                    }
+                }
+                .padding()
+                
+                Text("This rating will contribute to the show's overall rating.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                
+                if let success = successMessage {
+                    Text(success)
+                        .foregroundColor(.green)
+                        .padding()
+                }
+                
+                if let error = errorMessage {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .padding()
+                }
+                
+                Button(action: submitRating) {
+                    if isSubmitting {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                    } else {
+                        Text(userCurrentRating != nil ? "Update Rating" : "Submit Rating")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color.blue)
+                            .cornerRadius(10)
+                    }
+                }
+                .disabled(isSubmitting)
+                .padding(.horizontal)
+                
+                Spacer()
             }
             .padding()
-            
-            // Submit button
-            Button(action: {
-                onSubmit(selectedRating)
+            .navigationBarItems(trailing: Button("Done") {
                 dismiss()
-            }) {
-                Text("Submit Rating")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.blue)
-                    .cornerRadius(10)
-            }
-            .padding(.horizontal)
-            
-            // Skip button
-            Button("Skip Rating") {
-                dismiss()
-            }
-            .padding(.bottom)
+            })
         }
-        .padding()
-        .frame(width: 300, height: 300)
-        .background(Color(.systemBackground))
-        .cornerRadius(20)
-        .shadow(radius: 10)
+    }
+    
+    private func submitRating() {
+        guard let userId = authManager.currentUser?.uid, let showId = show.id else {
+            errorMessage = "Unable to submit rating. Please try again."
+            return
+        }
+        
+        isSubmitting = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                try await FirestoreShowService.shared.rateShow(
+                    showId: showId,
+                    userId: userId,
+                    rating: rating
+                )
+                
+                await MainActor.run {
+                    successMessage = "Rating submitted successfully!"
+                    isSubmitting = false
+                    onRatingSubmitted(rating)
+                    
+                    // Auto dismiss after a short delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        dismiss()
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to submit rating: \(error.localizedDescription)"
+                    isSubmitting = false
+                }
+            }
+        }
     }
 }
 

@@ -1,6 +1,7 @@
 import Foundation
 import FirebaseFirestore
 import FirebaseFirestoreSwift
+import Firebase
 
 struct ShowReview: Identifiable, Codable {
     @DocumentID var id: String?
@@ -42,61 +43,47 @@ class FirestoreReviewService {
     
     // Add a review for a show
     func addReview(userId: String, showId: String, content: String, rating: Double) async throws -> String {
-        // Get basic user profile info directly from Firestore
+        // First try to get username from UserManager (more reliable)
+        var username = "User"
+        var profileImageBase64: String?
+        
         do {
-            // Get user's profile document
+            // Get username from UserManager
+            let userData = try await UserManager.shared.getUser(userId: userId)
+            username = userData.username
+            
+            // Get profile image from ProfilesCollection
             let profileDoc = try await profilesCollection.document(userId).getDocument()
             let profileData = profileDoc.data()
-            
-            // Extract username and profile image
-            let username = profileData?["username"] as? String ?? "User"
-            let profileImageBase64 = profileData?["profileImageBase64"] as? String
-            
-            let review = ShowReview(
-                userId: userId,
-                showId: showId,
-                content: content,
-                rating: rating,
-                timestamp: Date(),
-                username: username,
-                userProfileImageURL: profileImageBase64
-            )
-            
-            let reviewRef = reviewsCollection.document()
-            try reviewRef.setData(from: review)
-            
-            // Update the show's reviews count
-            let showRef = showsCollection.document(showId)
-            try await showRef.updateData([
-                "commentsCount": FieldValue.increment(Int64(1))
-            ])
-            
-            return reviewRef.documentID
+            profileImageBase64 = profileData?["profileImageBase64"] as? String
         } catch {
-            print("Error getting profile for review: \(error)")
-            
-            // Create a review without profile data
-            let review = ShowReview(
-                userId: userId,
-                showId: showId,
-                content: content,
-                rating: rating,
-                timestamp: Date(),
-                username: "User",
-                userProfileImageURL: nil
-            )
-            
-            let reviewRef = reviewsCollection.document()
-            try reviewRef.setData(from: review)
-            
-            // Update the show's reviews count
-            let showRef = showsCollection.document(showId)
-            try await showRef.updateData([
-                "commentsCount": FieldValue.increment(Int64(1))
-            ])
-            
-            return reviewRef.documentID
+            print("Error getting user data for review: \(error)")
+            // Continue with default values
         }
+        
+        let review = ShowReview(
+            userId: userId,
+            showId: showId,
+            content: content,
+            rating: rating,
+            timestamp: Date(),
+            username: username,
+            userProfileImageURL: profileImageBase64
+        )
+        
+        let reviewRef = reviewsCollection.document()
+        try reviewRef.setData(from: review)
+        
+        // Update the show's reviews count
+        let showRef = showsCollection.document(showId)
+        try await showRef.updateData([
+            "commentsCount": FieldValue.increment(Int64(1))
+        ])
+        
+        // Also update the show's rating
+        try await updateShowRating(showId: showId, userId: userId, rating: rating)
+        
+        return reviewRef.documentID
     }
     
     // Get all reviews for a show
@@ -129,17 +116,37 @@ class FirestoreReviewService {
     
     // Delete a review
     func deleteReview(reviewId: String) async throws {
-        // Get the review first to get the showId
+        // Get the review first to get the showId and userId
         let review = try await reviewsCollection.document(reviewId).getDocument(as: ShowReview.self)
+        let showId = review.showId
+        let userId = review.userId
         
         // Delete the review
         try await reviewsCollection.document(reviewId).delete()
         
         // Update the show's review count
-        let showRef = showsCollection.document(review.showId)
+        let showRef = showsCollection.document(showId)
         try await showRef.updateData([
             "commentsCount": FieldValue.increment(Int64(-1))
         ])
+        
+        // Get the show to remove the user's rating
+        let showDoc = try await showRef.getDocument()
+        if let data = showDoc.data(),
+           var userRatings = data["userRatings"] as? [String: Double] {
+            
+            // Remove this user's rating
+            userRatings.removeValue(forKey: userId)
+            
+            // Calculate new average (if any ratings remain)
+            let newAverage = userRatings.isEmpty ? 0.0 : userRatings.values.reduce(0.0, +) / Double(userRatings.count)
+            
+            // Update the document
+            try await showRef.updateData([
+                "userRatings": userRatings,
+                "averageUserRating": newAverage
+            ])
+        }
     }
     
     // Like a review
@@ -166,11 +173,25 @@ class FirestoreReviewService {
     // Edit a review
     func editReview(reviewId: String, content: String, rating: Double) async throws {
         let reviewRef = reviewsCollection.document(reviewId)
+        let review = try await reviewRef.getDocument(as: ShowReview.self)
         
         try await reviewRef.updateData([
             "content": content,
             "rating": rating,
             "timestamp": Date() // Update timestamp to show it was edited
         ])
+        
+        // Also update the show's rating
+        try await updateShowRating(showId: review.showId, userId: review.userId, rating: rating)
+    }
+    
+    // Helper function to update the show's rating
+    private func updateShowRating(showId: String, userId: String, rating: Double) async throws {
+        // Call FirestoreShowService to update the show's rating
+        try await FirestoreShowService.shared.rateShow(
+            showId: showId,
+            userId: userId,
+            rating: rating
+        )
     }
 } 
