@@ -68,10 +68,30 @@ class ProfileManager {
     static let shared = ProfileManager()
     private let profileCollection = Firestore.firestore().collection("profiles")
     
-    // Add image cache
+    // Add image cache with thread safety
     private var imageCache: [String: UIImage] = [:]
+    private let cacheLock = NSLock()
     
     private init() { }
+    
+    // Safe cache access methods
+    private func getCachedImage(_ userId: String) -> UIImage? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        return imageCache[userId]
+    }
+    
+    private func setCachedImage(_ userId: String, image: UIImage) {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        imageCache[userId] = image
+    }
+    
+    private func clearImageCache() {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        imageCache.removeAll()
+    }
     
     // Save or update user profile data
     func saveProfile(userId: String, username: String, bio: String, location: String, profileImage: UIImage?, isPublic: Bool = true) async throws {
@@ -93,8 +113,8 @@ class ProfileManager {
                 throw NSError(domain: "ProfileManagerError", code: 400, userInfo: [NSLocalizedDescriptionKey: "Failed to resize image"])
             }
             
-            // Add to cache
-            imageCache[userId] = resizedImage
+            // Add to cache safely
+            setCachedImage(userId, image: resizedImage)
             
             guard let imageData = resizedImage.jpegData(compressionQuality: 0.3) else {
                 throw NSError(domain: "ProfileManagerError", code: 400, userInfo: [NSLocalizedDescriptionKey: "Failed to compress image"])
@@ -146,11 +166,11 @@ class ProfileManager {
         
         let profileImageBase64 = data["profileImageBase64"] as? String
         
-        // If there's a base64 image, decode and cache it
+        // If there's a base64 image, decode and cache it safely
         if let base64String = profileImageBase64, 
            let imageData = Data(base64Encoded: base64String),
            let image = UIImage(data: imageData) {
-            imageCache[userId] = image
+            setCachedImage(userId, image: image)
         }
         
         // Parse watched shows list
@@ -190,8 +210,8 @@ class ProfileManager {
     
     // Get profile image (from cache or decode from base64)
     func getProfileImage(userId: String) async throws -> UIImage? {
-        // First check cache
-        if let cachedImage = imageCache[userId] {
+        // First check cache safely
+        if let cachedImage = getCachedImage(userId) {
             print("Using cached profile image for user \(userId)")
             return cachedImage
         }
@@ -202,8 +222,8 @@ class ProfileManager {
            let base64String = data["profileImageBase64"] as? String,
            let imageData = Data(base64Encoded: base64String),
            let image = UIImage(data: imageData) {
-            // Cache the image
-            imageCache[userId] = image
+            // Cache the image safely
+            setCachedImage(userId, image: image)
             return image
         }
         
@@ -212,7 +232,7 @@ class ProfileManager {
     
     // Clear cache for testing
     func clearCache() {
-        imageCache.removeAll()
+        clearImageCache()
     }
     
     // Add a show to the watched list

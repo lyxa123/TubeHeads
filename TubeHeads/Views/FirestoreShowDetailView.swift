@@ -252,6 +252,16 @@ struct FirestoreShowDetailView: View {
                             .font(.body)
                             .lineSpacing(4)
                     }
+                    
+                    // Divider before reviews section
+                    Divider()
+                        .padding(.vertical, 8)
+                    
+                    // Reviews section
+                    if let showId = firestoreShow.id {
+                        ReviewsView(showId: showId, showName: firestoreShow.name)
+                            .environmentObject(authManager)
+                    }
                 }
                 .padding(.horizontal)
             }

@@ -162,6 +162,35 @@ struct ShowDetailView: View {
                             .font(.body)
                             .lineSpacing(4)
                     }
+                    
+                    // Divider before reviews section
+                    Divider()
+                        .padding(.vertical, 8)
+                    
+                    // Reviews section
+                    if let show = firestoreShow, let showId = show.id {
+                        ReviewsView(showId: showId, showName: initialTVShow.name)
+                            .environmentObject(authManager)
+                    } else {
+                        // Show a placeholder until the firestore show is loaded
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Reviews")
+                                .font(.headline)
+                            
+                            if isLoading {
+                                HStack {
+                                    Spacer()
+                                    ProgressView()
+                                    Spacer()
+                                }
+                                .padding()
+                            } else {
+                                Text("Loading reviews...")
+                                    .foregroundColor(.gray)
+                                    .padding()
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal)
             }
