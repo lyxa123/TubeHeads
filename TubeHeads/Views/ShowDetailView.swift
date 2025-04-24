@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseFirestore
 
 struct ShowDetailView: View {
     let tmdbId: Int
@@ -8,6 +9,8 @@ struct ShowDetailView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var userRating: Double = 0
+    @State private var isInWatchlist = false
+    @State private var isAddingToWatchlist = false
     
     // Assume we have a user manager that can get current user ID
     @EnvironmentObject private var authManager: AuthManager
@@ -54,6 +57,46 @@ struct ShowDetailView: View {
                     Text(initialTVShow.releaseYear)
                         .font(.subheadline)
                         .foregroundColor(.gray)
+                    
+                    // Watchlist button
+                    if authManager.isSignedIn {
+                        Button(action: {
+                            toggleWatchlist()
+                        }) {
+                            HStack {
+                                Image(systemName: isInWatchlist ? "bookmark.fill" : "bookmark")
+                                Text(isInWatchlist ? "Remove from Watchlist" : "Add to Watchlist")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(isInWatchlist ? Color.green.opacity(0.8) : Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                            .overlay(
+                                Group {
+                                    if isAddingToWatchlist {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    }
+                                }
+                            )
+                        }
+                        .disabled(isAddingToWatchlist)
+                    } else {
+                        Button(action: {
+                            // Navigate to sign in
+                        }) {
+                            HStack {
+                                Image(systemName: "bookmark")
+                                Text("Sign in to add to Watchlist")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.gray)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                    }
                     
                     // User rating section
                     VStack(alignment: .leading, spacing: 8) {
@@ -119,6 +162,35 @@ struct ShowDetailView: View {
                             .font(.body)
                             .lineSpacing(4)
                     }
+                    
+                    // Divider before reviews section
+                    Divider()
+                        .padding(.vertical, 8)
+                    
+                    // Reviews section
+                    if let show = firestoreShow, let showId = show.id {
+                        ReviewsView(showId: showId, showName: initialTVShow.name)
+                            .environmentObject(authManager)
+                    } else {
+                        // Show a placeholder until the firestore show is loaded
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Reviews")
+                                .font(.headline)
+                            
+                            if isLoading {
+                                HStack {
+                                    Spacer()
+                                    ProgressView()
+                                    Spacer()
+                                }
+                                .padding()
+                            } else {
+                                Text("Loading reviews...")
+                                    .foregroundColor(.gray)
+                                    .padding()
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal)
             }
@@ -140,14 +212,25 @@ struct ShowDetailView: View {
                 firestoreShow = show
                 
                 // Get user's rating if available
-                if let userId = authManager.currentUser?.uid,
-                   let userRatingValue = show.userRatings[userId] {
-                    userRating = userRatingValue
+                if let userId = authManager.currentUser?.uid {
+                    if let userRatingValue = show.userRatings[userId] {
+                        userRating = userRatingValue
+                    }
+                    
+                    // Check if show is in user's watchlist
+                    if let showId = show.id {
+                        isInWatchlist = try await WatchlistService.shared.isInWatchlist(userId: userId, showId: showId)
+                    }
                 }
             } else {
                 // If not, save it to Firestore
                 let showId = try await FirestoreShowService.shared.saveShow(from: initialTVShow)
                 firestoreShow = try await FirestoreShowService.shared.getShow(id: showId)
+                
+                // Check if show is in user's watchlist after saving
+                if let userId = authManager.currentUser?.uid {
+                    isInWatchlist = try await WatchlistService.shared.isInWatchlist(userId: userId, showId: showId)
+                }
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -176,6 +259,31 @@ struct ShowDetailView: View {
             } catch {
                 print("Error submitting rating: \(error)")
             }
+        }
+    }
+    
+    private func toggleWatchlist() {
+        guard let showId = firestoreShow?.id,
+              let userId = authManager.currentUser?.uid else {
+            return
+        }
+        
+        isAddingToWatchlist = true
+        
+        Task {
+            do {
+                if isInWatchlist {
+                    try await WatchlistService.shared.removeFromWatchlist(userId: userId, showId: showId)
+                    isInWatchlist = false
+                } else {
+                    try await WatchlistService.shared.addToWatchlist(userId: userId, showId: showId)
+                    isInWatchlist = true
+                }
+            } catch {
+                print("Error toggling watchlist: \(error)")
+            }
+            
+            isAddingToWatchlist = false
         }
     }
 }
