@@ -1,60 +1,6 @@
 import SwiftUI
 import FirebaseAuth
 
-@MainActor
-final class SignInViewModel: ObservableObject {
-    @Published var email = ""
-    @Published var password = ""
-    @Published var errorMessage = ""
-    @Published var showError = false
-    
-    func signIn(authManager: AuthManager) async {
-        guard !email.isEmpty, !password.isEmpty else {
-            errorMessage = "Please enter both email and password."
-            showError = true
-            return
-        }
-        
-        do {
-            // Sign in with auth manager
-            try await authManager.signIn(email: email, password: password)
-            
-            // Refresh token after sign in to ensure valid token
-            if Auth.auth().currentUser != nil {
-                print("SignInViewModel: Refreshing auth token after sign in")
-                try? await authManager.refreshAuthToken()
-            }
-            
-            // Debug auth state after signing in
-            // authManager.debugAuthState()
-            
-            return
-        } catch {
-            handleAuthError(error)
-        }
-    }
-    
-    private func handleAuthError(_ error: Error) {
-        print("SignInViewModel: Auth error: \(error.localizedDescription)")
-        
-        if let authError = error as? AuthErrorCode {
-            switch authError.code {
-            case .userNotFound:
-                errorMessage = "Account doesn't exist. Please sign up instead."
-            case .wrongPassword:
-                errorMessage = "Invalid password. Please try again."
-            case .invalidEmail:
-                errorMessage = "Invalid email format."
-            default:
-                errorMessage = "Authentication error: \(authError.localizedDescription)"
-            }
-        } else {
-            errorMessage = "Error: \(error.localizedDescription)"
-        }
-        showError = true
-    }
-}
-
 struct SignInView: View {
     @StateObject private var viewModel = SignInViewModel()
     @EnvironmentObject private var authManager: AuthManager
@@ -112,7 +58,7 @@ struct SignInView: View {
                         await viewModel.signIn(authManager: authManager)
                         
                         // Check for any Firestore-related errors
-                        if Auth.auth().currentUser != nil {
+                        if Auth.auth().currentUser != nil && !viewModel.showError {
                             do {
                                 if let uid = Auth.auth().currentUser?.uid {
                                     // Try to access user data to verify Firestore permissions
