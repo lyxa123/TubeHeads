@@ -3,6 +3,8 @@ import FirebaseAuth
 import PhotosUI
 import FirebaseFirestore
 import FirebaseStorage
+// Import the file containing UserProfileImageView
+import UIKit
 
 // Extended user profile model to include profile-specific fields
 struct UserProfile: Codable {
@@ -272,6 +274,25 @@ class ProfileManager {
         ])
     }
     
+    // Update the watched shows list for a user
+    func updateWatchedShows(userId: String, watchedShows: [WatchedShow]) async throws {
+        // Prepare safe data for Firestore
+        let watchedShowsData = watchedShows.map { show in
+            return [
+                "id": show.id,
+                "title": show.title,
+                "imageName": show.imageName ?? "",
+                "dateWatched": Timestamp(date: show.dateWatched),
+                "rating": show.rating ?? 0
+            ]
+        }
+        
+        // Update the watched shows in Firestore
+        try await profileCollection.document(userId).updateData([
+            "watchedShows": watchedShowsData
+        ])
+    }
+    
     // Remove a show from the watched list
     func removeWatchedShow(userId: String, showId: String) async throws {
         // Get the current profile
@@ -433,7 +454,7 @@ struct ProfileView: View {
                             .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
                             .shadow(radius: 1)
                     } else {
-                        ProfileImage(size: 100)
+                        UserProfileImageView(size: 100)
                     }
                     
                     Text(bio)
@@ -680,7 +701,7 @@ struct EditProfileView: View {
                             .clipShape(Circle())
                             .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
                     } else {
-                        ProfileImage(size: 120)
+                        UserProfileImageView(size: 120)
                     }
                     
                     PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
@@ -867,28 +888,6 @@ struct EditProfileView: View {
 }
 
 // Supporting Views
-struct ProfileImage: View {
-    let size: CGFloat
-    
-    var body: some View {
-        // Fallback to a system image if profileImage doesn't exist
-        if UIImage(named: "profileImage") != nil {
-            Image("profileImage")
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: size, height: size)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
-                .shadow(radius: 1)
-        } else {
-            Image(systemName: "person.circle.fill")
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: size, height: size)
-                .foregroundColor(.gray)
-        }
-    }
-}
 
 // Watched Shows List Component - Changed to vertical list
 struct WatchedShowsList: View {

@@ -4,6 +4,7 @@ import FirebaseFirestore
 struct ReviewsView: View {
     let showId: String
     let showName: String
+    var onReviewAdded: () -> Void = {}
     
     @State private var reviews: [ShowReview] = []
     @State private var isLoading = false
@@ -11,6 +12,7 @@ struct ReviewsView: View {
     @State private var showAddReviewSheet = false
     @State private var userReview: ShowReview?
     @State private var showEditReviewSheet = false
+    @State private var userExistingRating: Double? = nil
     
     @EnvironmentObject private var authManager: AuthManager
     
@@ -31,6 +33,10 @@ struct ReviewsView: View {
                     }
                     .disabled(userReview != nil)
                 }
+            }
+            
+            if userReview == nil && authManager.isSignedIn {
+                // All rating-related prompt text removed
             }
             
             if isLoading {
@@ -73,6 +79,7 @@ struct ReviewsView: View {
             AddReviewView(showId: showId, showName: showName) { newReview in
                 Task {
                     await loadReviews()
+                    onReviewAdded()
                 }
             }
             .environmentObject(authManager)
@@ -82,6 +89,7 @@ struct ReviewsView: View {
                 EditReviewView(review: review) {
                     Task {
                         await loadReviews()
+                        onReviewAdded()
                     }
                 }
                 .environmentObject(authManager)
@@ -89,6 +97,7 @@ struct ReviewsView: View {
         }
         .task {
             await loadReviews()
+            await loadUserRating()
         }
     }
     
@@ -113,6 +122,23 @@ struct ReviewsView: View {
         isLoading = false
     }
     
+    private func loadUserRating() async {
+        guard let userId = authManager.currentUser?.uid else { return }
+        
+        do {
+            let show = try await FirestoreShowService.shared.getShow(id: showId)
+            let existingRating = show.userRatings[userId]
+            
+            await MainActor.run {
+                if let rating = existingRating {
+                    userExistingRating = rating
+                }
+            }
+        } catch {
+            print("Error loading user rating: \(error)")
+        }
+    }
+    
     private func likeReview(reviewId: String) {
         guard let userId = authManager.currentUser?.uid else { return }
         
@@ -131,6 +157,7 @@ struct ReviewsView: View {
             do {
                 try await FirestoreReviewService.shared.deleteReview(reviewId: reviewId)
                 await loadReviews()
+                onReviewAdded()
             } catch {
                 print("Error deleting review: \(error)")
             }
@@ -204,21 +231,40 @@ struct ReviewCard: View {
     let onDelete: () -> Void
     
     @EnvironmentObject private var authManager: AuthManager
+    @State private var showUserProfile = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                // User profile image - simplified with dedicated component
-                ReviewProfileImage(
-                    userId: review.userId,
-                    base64ImageString: review.userProfileImageURL,
-                    size: 40
-                )
+                // User profile image with navigation to user profile
+                Button(action: {
+                    if !isUserReview {
+                        showUserProfile = true
+                    }
+                }) {
+                    ReviewProfileImage(
+                        userId: review.userId,
+                        base64ImageString: review.userProfileImageURL,
+                        size: 40
+                    )
+                }
+                .disabled(isUserReview)
+                .buttonStyle(PlainButtonStyle())
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(review.username ?? "Anonymous")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+                    // Username with navigation to user profile
+                    Button(action: {
+                        if !isUserReview {
+                            showUserProfile = true
+                        }
+                    }) {
+                        Text(review.username ?? "Anonymous")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                    }
+                    .disabled(isUserReview)
+                    .buttonStyle(PlainButtonStyle())
                     
                     Text(review.formattedDate)
                         .font(.caption)
@@ -293,6 +339,11 @@ struct ReviewCard: View {
                 .padding(.top, 4)
             }
         }
+        .sheet(isPresented: $showUserProfile) {
+            NavigationView {
+                UserProfileView(userId: review.userId)
+            }
+        }
     }
 }
 
@@ -300,6 +351,7 @@ struct AddReviewView: View {
     let showId: String
     let showName: String
     let onSubmit: (ShowReview) -> Void
+    @State private var userExistingRating: Double?
     
     @State private var reviewText = ""
     @State private var rating: Double = 3
@@ -321,17 +373,21 @@ struct AddReviewView: View {
                         
                         HStack {
                             ForEach(1...5, id: \.self) { star in
-                                Image(systemName: star <= Int(rating) ? "star.fill" : "star")
+                                let ratingValue = userExistingRating ?? rating
+                                Image(systemName: star <= Int(ratingValue) ? "star.fill" : "star")
                                     .foregroundColor(.yellow)
                                     .onTapGesture {
-                                        rating = Double(star)
+                                        if userExistingRating == nil {
+                                            rating = Double(star)
+                                        }
                                     }
                             }
                         }
+                        .opacity(userExistingRating != nil ? 0.7 : 1.0)
                     }
                 }
                 
-                Section(header: Text("Review")) {
+                Section(header: Text("Written Review")) {
                     TextEditor(text: $reviewText)
                         .frame(minHeight: 150)
                         .overlay(
@@ -379,12 +435,18 @@ struct AddReviewView: View {
                 }
             }
         }
+        .task {
+            await loadUserRating()
+        }
     }
     
     private func submitReview() {
         guard let userId = authManager.currentUser?.uid, !reviewText.isEmpty else {
             return
         }
+        
+        // Use the existing rating if present or the selected rating
+        let finalRating = userExistingRating ?? rating
         
         isSubmitting = true
         errorMessage = nil
@@ -395,7 +457,7 @@ struct AddReviewView: View {
                     userId: userId,
                     showId: showId,
                     content: reviewText,
-                    rating: rating
+                    rating: finalRating
                 )
                 
                 // Get the created review
@@ -414,6 +476,23 @@ struct AddReviewView: View {
                     isSubmitting = false
                 }
             }
+        }
+    }
+    
+    private func loadUserRating() async {
+        guard let userId = authManager.currentUser?.uid else { return }
+        
+        do {
+            let show = try await FirestoreShowService.shared.getShow(id: showId)
+            let existingRating = show.userRatings[userId]
+            
+            await MainActor.run {
+                if let rating = existingRating {
+                    userExistingRating = rating
+                }
+            }
+        } catch {
+            print("Error loading user rating: \(error)")
         }
     }
 }
@@ -457,6 +536,11 @@ struct EditReviewView: View {
                             }
                         }
                     }
+                    
+                    Text("Changing your rating will update the show's overall rating.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 4)
                 }
                 
                 Section(header: Text("Review")) {
