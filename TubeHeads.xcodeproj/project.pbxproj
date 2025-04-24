@@ -440,6 +440,9 @@
 				DEVELOPMENT_TEAM = H84AWLVU89;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "";
+				INFOPLIST_KEY_NSLocationUsageDescription = "Your location is used only for your profile information.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "TubeHeads needs your location to display it on your profile, helping you connect with TV fans in your area.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -469,6 +472,9 @@
 				DEVELOPMENT_TEAM = H84AWLVU89;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "";
+				INFOPLIST_KEY_NSLocationUsageDescription = "Your location is used only for your profile information.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "TubeHeads needs your location to display it on your profile, helping you connect with TV fans in your area.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

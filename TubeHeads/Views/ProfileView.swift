@@ -387,7 +387,8 @@ struct ProfileView: View {
                     username: username,
                     bio: bio,
                     location: location,
-                    isPublic: isPublic, profileImage: profileImage,
+                    isPublic: isPublic, 
+                    profileImage: profileImage,
                     onSave: { newBio, newLocation, newImage, newIsPublic in
                         saveUserProfile(bio: newBio, location: newLocation, image: newImage, isPublic: newIsPublic)
                     }
@@ -662,8 +663,10 @@ struct EditProfileView: View {
     @State private var isSaving = false
     @State private var showCountryPicker = false
     @State private var showSizeWarning = false
+    @State private var showLocationPermission = false
     @State var isPublic: Bool
     @FocusState private var isLocationFocused: Bool
+    @StateObject private var locationManager = LocationManager.shared
     
     // Initial profile image passed from ProfileView
     let profileImage: UIImage?
@@ -755,22 +758,47 @@ struct EditProfileView: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
-                        Button(action: {
-                            showCountryPicker = true
-                        }) {
-                            HStack {
-                                Text(location.isEmpty ? "Select your location" : location)
-                                    .foregroundColor(location.isEmpty ? .gray : .primary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.down")
-                                    .foregroundColor(.gray)
+                        HStack {
+                            Button(action: {
+                                showCountryPicker = true
+                            }) {
+                                HStack {
+                                    Text(location.isEmpty ? "Select your location" : location)
+                                        .foregroundColor(location.isEmpty ? .gray : .primary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.down")
+                                        .foregroundColor(.gray)
+                                }
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(8)
                             }
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(8)
+                            
+                            Button(action: {
+                                // Show location permission dialog
+                                if locationManager.authorizationStatus == .notDetermined {
+                                    showLocationPermission = true
+                                } else if locationManager.authorizationStatus == .authorizedWhenInUse || 
+                                          locationManager.authorizationStatus == .authorizedAlways {
+                                    // Already authorized, request location
+                                    locationManager.requestLocation()
+                                } else {
+                                    // Denied, show system settings prompt
+                                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                                        UIApplication.shared.open(url)
+                                    }
+                                }
+                            }) {
+                                Image(systemName: "location.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(.blue)
+                                    .padding(12)
+                                    .background(Color(.systemGray6))
+                                    .cornerRadius(8)
+                            }
                         }
                     }
                     
@@ -871,6 +899,38 @@ struct EditProfileView: View {
                             showCountryPicker = false
                         }
                     }
+                }
+            }
+        }
+        .onAppear {
+            // Setup location manager
+            if locationManager.location == nil && 
+               (locationManager.authorizationStatus == .authorizedWhenInUse || 
+                locationManager.authorizationStatus == .authorizedAlways) {
+                locationManager.requestLocation()
+            }
+        }
+        .onChange(of: locationManager.placemark) { newPlacemark in
+            if let locationString = locationManager.getLocationString() {
+                location = locationString
+            }
+        }
+        .overlay {
+            if showLocationPermission {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .edgesIgnoringSafeArea(.all)
+                        .onTapGesture {
+                            showLocationPermission = false
+                        }
+                    
+                    LocationPermissionView(
+                        showPermissionView: $showLocationPermission,
+                        onAllow: {
+                            locationManager.requestLocationPermission()
+                        }
+                    )
+                    .frame(width: UIScreen.main.bounds.width * 0.9)
                 }
             }
         }
