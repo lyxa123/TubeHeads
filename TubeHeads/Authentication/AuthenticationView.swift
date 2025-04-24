@@ -59,6 +59,12 @@ struct AuthenticationView: View {
             }
             
             Spacer()
+            
+            // Footer text
+            Text("Track and discover your favorite TV shows")
+                .font(.caption)
+                .foregroundColor(.gray)
+                .padding(.bottom, 8)
         }
         .padding()
     }

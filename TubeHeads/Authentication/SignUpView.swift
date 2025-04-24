@@ -9,8 +9,11 @@ final class SignUpViewModel: ObservableObject {
     @Published var username = ""
     @Published var errorMessage = ""
     @Published var showError = false
+    @Published var verificationEmailSent = false
     
     func signUp(authManager: AuthManager) async {
+        print("SignUpViewModel: Starting sign up process")
+        
         // Validate input
         if email.isEmpty || password.isEmpty || username.isEmpty {
             errorMessage = "Please fill in all fields."
@@ -41,6 +44,7 @@ final class SignUpViewModel: ObservableObject {
         
         // Check if username already exists
         do {
+            print("SignUpViewModel: Checking if username exists")
             let usernameExists = try await UserManager.shared.usernameExists(username)
             if usernameExists {
                 errorMessage = "Username already taken. Please choose another."
@@ -48,16 +52,29 @@ final class SignUpViewModel: ObservableObject {
                 return
             }
             
+            print("SignUpViewModel: Creating account")
             // Create user with our AuthManager
             try await authManager.createAccount(email: email, password: password, username: username)
             
+            // Send email verification
+            try await authManager.sendEmailVerification()
+            print("SignUpViewModel: Verification email sent to \(email)")
+            verificationEmailSent = true
+            
+            // Refresh token to ensure valid token
+            print("SignUpViewModel: Refreshing auth token after signup")
+            try await authManager.refreshAuthToken()
+            
             return
         } catch {
+            print("SignUpViewModel: Error during signup: \(error.localizedDescription)")
             handleAuthError(error)
         }
     }
     
     private func handleAuthError(_ error: Error) {
+        print("SignUpViewModel: Auth error: \(error.localizedDescription)")
+        
         if let authError = error as? AuthErrorCode {
             switch authError.code {
             case .emailAlreadyInUse:
@@ -81,6 +98,7 @@ struct SignUpView: View {
     @EnvironmentObject private var authManager: AuthManager
     @Binding var showSignInView: Bool
     @State private var isLoading = false
+    @State private var firebaseError: String? = nil
     
     var body: some View {
         VStack(spacing: 20) {
@@ -119,34 +137,74 @@ struct SignUpView: View {
                     .padding(.vertical, 5)
             }
             
+            if let error = firebaseError {
+                Text("Firebase error: \(error)")
+                    .foregroundColor(.red)
+                    .font(.caption)
+                    .padding(.vertical, 5)
+                    .onAppear {
+                        // Clear error after 5 seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                            firebaseError = nil
+                        }
+                    }
+            }
+            
+            if viewModel.verificationEmailSent {
+                Text("Verification email sent! Please check your inbox.")
+                    .foregroundColor(.green)
+                    .padding(.vertical, 5)
+            }
+            
             Button {
                 Task {
+                    // Debug auth state before sign up
+                    print("SignUpView: Checking auth state before sign up")
+                    // authManager.debugAuthState()
+                    
                     isLoading = true
-                    await viewModel.signUp(authManager: authManager)
-                    isLoading = false
-                    if !viewModel.showError {
-                        showSignInView = false
+                    do {
+                        await viewModel.signUp(authManager: authManager)
+                        
+                        // Check for any Firestore-related errors after signup
+                        if Auth.auth().currentUser != nil {
+                            do {
+                                if let uid = Auth.auth().currentUser?.uid {
+                                    // Try to access user data to verify Firestore permissions
+                                    let _ = try await UserManager.shared.getUser(userId: uid)
+                                    print("SignUpView: Successfully accessed Firestore after sign up")
+                                }
+                            } catch {
+                                firebaseError = "Firestore access error: \(error.localizedDescription)"
+                                print("SignUpView: \(firebaseError!)")
+                            }
+                        }
+                        
+                        isLoading = false
+                        if !viewModel.showError {
+                            showSignInView = false
+                        }
+                    } catch {
+                        isLoading = false
+                        print("SignUpView: Error during sign up process: \(error.localizedDescription)")
                     }
                 }
             } label: {
-                if isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .black))
-                        .frame(height: 55)
-                        .frame(maxWidth: .infinity)
-                        .background(Color(hex: "#f6bebe"))
-                        .cornerRadius(10)
-                        .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
-                } else {
-                    Text("Create Account")
-                        .font(.headline)
-                        .foregroundColor(.black)
-                        .frame(height: 55)
-                        .frame(maxWidth: .infinity)
-                        .background(Color(hex: "#f6bebe"))
-                        .cornerRadius(10)
-                        .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
+                Group {
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                    } else {
+                        Text("Create Account")
+                            .font(.headline)
+                            .foregroundColor(.black)
+                    }
                 }
+                .frame(height: 55)
+                .frame(maxWidth: .infinity)
+                .background(Color(hex: "#f6bebe"))
+                .cornerRadius(10)
+                .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
             }
             .disabled(isLoading)
             
@@ -163,5 +221,13 @@ struct SignUpView: View {
         .padding()
         .navigationTitle("Sign Up")
         .disabled(isLoading)
+        .onAppear {
+            // Clear all errors when view appears
+            viewModel.showError = false
+            firebaseError = nil
+            viewModel.verificationEmailSent = false
+            // Check initial auth state
+            // authManager.debugAuthState()
+        }
     }
 } 

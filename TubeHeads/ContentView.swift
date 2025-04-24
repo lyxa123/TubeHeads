@@ -1,37 +1,69 @@
-
-
 import SwiftUI
 import SwiftData
+
+enum Tab {
+    case home, search, watchlist, lists, trending, profile
+}
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var items: [Item]
+    @State private var selection: Tab = .home
+    @State private var showSignInView: Bool = false
+    @EnvironmentObject var authManager: AuthManager
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
+        TabView(selection: $selection) {
+            NavigationView {
+                HomepageView(showSignInView: $showSignInView)
             }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
+            .tabItem {
+                Label("Home", systemImage: "house")
             }
-        } detail: {
-            Text("Select an item")
+            .tag(Tab.home)
+            
+            NavigationView {
+                SearchView()
+            }
+            .tabItem {
+                Label("Search", systemImage: "magnifyingglass")
+            }
+            .tag(Tab.search)
+            
+            NavigationView {
+                WatchlistView()
+            }
+            .tabItem {
+                Label("Watchlist", systemImage: "bookmark")
+            }
+            .tag(Tab.watchlist)
+            
+            NavigationView {
+                UserListsView()
+            }
+            .tabItem {
+                Label("Lists", systemImage: "list.bullet")
+            }
+            .tag(Tab.lists)
+            
+            NavigationView {
+                TrendingTVView()
+            }
+            .tabItem {
+                Label("Trending", systemImage: "flame")
+            }
+            .tag(Tab.trending)
+            
+            NavigationView {
+                ProfileView()
+            }
+            .tabItem {
+                Label("Profile", systemImage: "person")
+            }
+            .tag(Tab.profile)
         }
+        .accentColor(.red)
+        .environmentObject(authManager)
     }
 
     private func addItem() {
@@ -53,4 +85,5 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .modelContainer(for: Item.self, inMemory: true)
+        .environmentObject(AuthManager())
 }
