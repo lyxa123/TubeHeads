@@ -342,6 +342,7 @@ struct ReviewCard: View {
         .sheet(isPresented: $showUserProfile) {
             NavigationView {
                 UserProfileView(userId: review.userId)
+                    .environmentObject(authManager)
             }
         }
     }

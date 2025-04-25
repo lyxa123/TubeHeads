@@ -13,7 +13,10 @@ struct UserProfileView: View {
     @State private var errorMessage: String? = nil
     @State private var isPublic: Bool = true
     @State private var watchedShows: [WatchedShow] = []
+    @State private var userLists: [(id: String, name: String, description: String, isPrivate: Bool, userId: String, showIds: [String])] = []
+    @State private var isLoadingLists: Bool = false
     @Environment(\.presentationMode) var presentationMode
+    @EnvironmentObject private var authManager: AuthManager
     
     var body: some View {
         ScrollView {
@@ -104,12 +107,27 @@ struct UserProfileView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical)
                     
-                    // Watched shows section (only shown if profile is public)
+                    // Watched shows section
                     if !watchedShows.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Recently Watched")
-                                .font(.headline)
-                                .padding(.horizontal)
+                            HStack {
+                                Text("Watched Shows")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                
+                                Spacer()
+                                
+                                if watchedShows.count > 5 {
+                                    Button(action: {
+                                        // View all watched shows
+                                    }) {
+                                        Text("See All")
+                                            .font(.subheadline)
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
                             
                             ForEach(watchedShows.sorted(by: { $0.dateWatched > $1.dateWatched }).prefix(5)) { show in
                                 WatchedShowRow(show: show)
@@ -118,6 +136,49 @@ struct UserProfileView: View {
                                 if show.id != watchedShows.sorted(by: { $0.dateWatched > $1.dateWatched }).prefix(5).last?.id {
                                     Divider()
                                         .padding(.horizontal)
+                                }
+                            }
+                        }
+                        .padding(.vertical)
+                    }
+                    
+                    // Show Lists section
+                    if isLoadingLists {
+                        VStack {
+                            ProgressView()
+                            Text("Loading lists...")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                    } else if !userLists.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Show Lists")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                
+                                Spacer()
+                                
+                                if userLists.count > 3 {
+                                    Button(action: {
+                                        // View all lists
+                                    }) {
+                                        Text("See All")
+                                            .font(.subheadline)
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                            
+                            ForEach(userLists.prefix(3), id: \.id) { list in
+                                if !list.isPrivate {
+                                    NavigationLink(destination: UserListView(listId: list.id, listName: list.name)) {
+                                        ShowListRow(list: list)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
                             }
                         }
@@ -177,12 +238,221 @@ struct UserProfileView: View {
                     self.watchedShows = profile.isPublic ? profile.watchedShows : []
                     self.isLoading = false
                 }
+                
+                // Load user lists if profile is public
+                if profile.isPublic {
+                    loadUserLists()
+                }
             } catch {
                 await MainActor.run {
                     self.errorMessage = "Failed to load profile: \(error.localizedDescription)"
                     self.isLoading = false
                     self.isImageLoading = false
                 }
+            }
+        }
+    }
+    
+    private func loadUserLists() {
+        isLoadingLists = true
+        
+        Task {
+            do {
+                let lists = try await ListService.shared.getUserLists(userId: userId)
+                
+                // Filter out private lists if needed
+                let publicLists = lists.filter { !$0.isPrivate }
+                
+                await MainActor.run {
+                    self.userLists = publicLists.map { list in
+                        return (id: list.id ?? "", 
+                                name: list.name, 
+                                description: list.description, 
+                                isPrivate: list.isPrivate, 
+                                userId: list.userId, 
+                                showIds: list.showIds)
+                    }
+                    self.isLoadingLists = false
+                }
+            } catch {
+                print("Failed to load user lists: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.isLoadingLists = false
+                }
+            }
+        }
+    }
+}
+
+struct ShowListRow: View {
+    let list: (id: String, name: String, description: String, isPrivate: Bool, userId: String, showIds: [String])
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // List icon
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.blue.opacity(0.1))
+                    .frame(width: 45, height: 45)
+                
+                Image(systemName: "list.bullet")
+                    .font(.system(size: 20))
+                    .foregroundColor(.blue)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                // List name
+                Text(list.name)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                    .foregroundColor(.primary)
+                
+                // List description
+                if !list.description.isEmpty {
+                    Text(list.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                
+                // Show count
+                Text("\(list.showIds.count) shows")
+                    .font(.caption)
+                    .foregroundColor(.blue)
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(.gray)
+                .padding(.trailing, 4)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
+        .padding(.horizontal)
+    }
+}
+
+struct UserListView: View {
+    let listId: String
+    let listName: String
+    @State private var shows: [FirestoreShow] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String? = nil
+    
+    var body: some View {
+        VStack {
+            if isLoading {
+                ProgressView()
+            } else if let error = errorMessage {
+                Text("Error: \(error)")
+                    .foregroundColor(.red)
+            } else if shows.isEmpty {
+                Text("This list is empty")
+                    .foregroundColor(.gray)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(shows, id: \.tmdbId) { show in
+                            NavigationLink(destination: FirestoreShowDetailView(firestoreShow: show)) {
+                                HStack(spacing: 12) {
+                                    // Show thumbnail
+                                    if let posterPath = show.posterPath, !posterPath.isEmpty {
+                                        AsyncImage(url: URL(string: "https://image.tmdb.org/t/p/w200\(posterPath)")) { phase in
+                                            switch phase {
+                                            case .empty:
+                                                RoundedRectangle(cornerRadius: 4)
+                                                    .fill(Color.gray.opacity(0.3))
+                                                    .frame(width: 60, height: 90)
+                                                    .overlay(ProgressView())
+                                            case .success(let image):
+                                                image
+                                                    .resizable()
+                                                    .scaledToFill()
+                                                    .frame(width: 60, height: 90)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                                            case .failure:
+                                                RoundedRectangle(cornerRadius: 4)
+                                                    .fill(Color.gray.opacity(0.3))
+                                                    .frame(width: 60, height: 90)
+                                                    .overlay(Image(systemName: "tv"))
+                                            @unknown default:
+                                                EmptyView()
+                                            }
+                                        }
+                                    } else {
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(Color.gray.opacity(0.3))
+                                            .frame(width: 60, height: 90)
+                                            .overlay(Image(systemName: "tv"))
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(show.name)
+                                            .font(.headline)
+                                            .lineLimit(2)
+                                        
+                                        if !show.releaseYear.isEmpty {
+                                            Text(show.releaseYear)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
+                                .padding(.horizontal)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(.vertical)
+                }
+            }
+        }
+        .navigationTitle(listName)
+        .task {
+            await loadListShows()
+        }
+    }
+    
+    private func loadListShows() async {
+        isLoading = true
+        
+        do {
+            // First get the list
+            let list = try await ListService.shared.getList(id: listId)
+            
+            var listShows: [FirestoreShow] = []
+            
+            // Load each show in the list
+            for showId in list.showIds {
+                do {
+                    let show = try await FirestoreShowService.shared.getShow(id: showId)
+                    listShows.append(show)
+                } catch {
+                    print("Error loading show \(showId): \(error.localizedDescription)")
+                }
+            }
+            
+            await MainActor.run {
+                self.shows = listShows
+                self.isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = error.localizedDescription
+                self.isLoading = false
             }
         }
     }
