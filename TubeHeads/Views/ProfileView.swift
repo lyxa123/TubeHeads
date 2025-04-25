@@ -317,31 +317,6 @@ class ProfileManager {
             "watchedShows": watchedShowsData
         ])
     }
-    
-    // Update the rating of a watched show
-    func updateWatchedShowRating(userId: String, showId: String, rating: Int) async throws {
-        // Get the current profile
-        let profile = try await getProfile(userId: userId)
-        
-        // Find the show in the watched shows list
-        if let index = profile.watchedShows.firstIndex(where: { $0.id == showId }) {
-            // Update the rating
-            var updatedWatchedShows = profile.watchedShows
-            var updatedShow = updatedWatchedShows[index]
-            updatedShow.rating = rating
-            updatedWatchedShows[index] = updatedShow
-            
-            // Save the updated watched shows list
-            try await updateWatchedShows(userId: userId, watchedShows: updatedWatchedShows)
-            
-            // Also update the show rating in FirestoreShowService if it exists
-            try? await FirestoreShowService.shared.rateShow(
-                showId: showId,
-                userId: userId,
-                rating: Double(rating)
-            )
-        }
-    }
 }
 
 struct ProfileView: View {
