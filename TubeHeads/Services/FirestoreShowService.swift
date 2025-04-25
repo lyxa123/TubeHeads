@@ -92,10 +92,17 @@ class FirestoreShowService {
         // Get the current show to update ratings
         let show = try await showRef.getDocument(as: FirestoreShow.self)
         var userRatings = show.userRatings
-        userRatings[userId] = rating
         
-        // Calculate new average
-        let newAverage = userRatings.values.reduce(0.0, +) / Double(userRatings.count)
+        if rating == 0 {
+            // Remove the rating if it's 0
+            userRatings.removeValue(forKey: userId)
+        } else {
+            // Otherwise, update or add the rating
+            userRatings[userId] = rating
+        }
+        
+        // Calculate new average (avoid division by zero)
+        let newAverage = userRatings.isEmpty ? 0.0 : userRatings.values.reduce(0.0, +) / Double(userRatings.count)
         
         // Update the document
         try await showRef.updateData([

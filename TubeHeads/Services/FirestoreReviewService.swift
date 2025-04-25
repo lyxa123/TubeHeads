@@ -80,7 +80,7 @@ class FirestoreReviewService {
             "commentsCount": FieldValue.increment(Int64(1))
         ])
         
-        // Also update the show's rating
+        // Always update the show's rating to ensure consistency
         try await updateShowRating(showId: showId, userId: userId, rating: rating)
         
         return reviewRef.documentID
@@ -181,7 +181,7 @@ class FirestoreReviewService {
             "timestamp": Date() // Update timestamp to show it was edited
         ])
         
-        // Also update the show's rating
+        // Always update the show's rating to ensure consistency
         try await updateShowRating(showId: review.showId, userId: review.userId, rating: rating)
     }
     
