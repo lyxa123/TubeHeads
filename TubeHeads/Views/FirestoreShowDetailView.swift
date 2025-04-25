@@ -305,6 +305,7 @@ struct FirestoreShowDetailView: View {
             RateShowView(
                 show: firestoreShow, 
                 userCurrentRating: userRating,
+                isWatched: isWatched,
                 onRatingSubmitted: { newRating in
                     // Update the UI without reloading
                     userRating = newRating
@@ -380,11 +381,14 @@ struct FirestoreShowDetailView: View {
                         firestoreShow = updatedShow
                     }
                     
+                    // Check watchlist status
                     isInWatchlist = try await WatchlistService.shared.isInWatchlist(userId: userId, showId: showId)
                     
                     // Check if show is in user's watched list
                     let profile = try await ProfileManager.shared.getProfile(userId: userId)
-                    isWatched = profile.watchedShows.contains(where: { $0.id == showId })
+                    await MainActor.run {
+                        isWatched = profile.watchedShows.contains(where: { $0.id == showId })
+                    }
                     
                     // Get user's rating if available
                     userRating = getUserRating(userId: userId)
@@ -444,42 +448,51 @@ struct FirestoreShowDetailView: View {
         // Immediate UI feedback
         isMarkingWatched = true
         
-        Task {
-            do {
-                if isWatched {
-                    // Remove from watched shows
-                    let profile = try await ProfileManager.shared.getProfile(userId: userId)
-                    var updatedWatchedShows = profile.watchedShows.filter { $0.id != showId }
-                    
-                    try await ProfileManager.shared.updateWatchedShows(userId: userId, watchedShows: updatedWatchedShows)
-                    await MainActor.run {
-                        isWatched = false
-                    }
-                } else {
-                    // Add to watched shows
-                    let watchedShow = WatchedShow(
-                        id: showId,
-                        title: firestoreShow.name,
-                        imageName: firestoreShow.posterPath ?? "",
-                        dateWatched: Date(),
-                        rating: nil
-                    )
-                    
-                    try await ProfileManager.shared.addWatchedShow(userId: userId, show: watchedShow)
-                    await MainActor.run {
-                        isWatched = true
-                        // Show rating sheet directly
-                        showRateSheet = true
-                    }
+        do {
+            if isWatched {
+                // Remove from watched shows
+                let profile = try await ProfileManager.shared.getProfile(userId: userId)
+                
+                // Keep a reference to the current rating before removing
+                let watchedShow = profile.watchedShows.first(where: { $0.id == showId })
+                let userRatingValue = watchedShow?.rating
+                
+                // Remove from watched list
+                var updatedWatchedShows = profile.watchedShows.filter { $0.id != showId }
+                try await ProfileManager.shared.updateWatchedShows(userId: userId, watchedShows: updatedWatchedShows)
+                
+                // If there was a rating, keep it in FirestoreShowService
+                if let rating = userRatingValue, rating > 0 {
+                    // No need to update FirestoreShow rating, as it's already there
                 }
-            } catch {
-                print("Error toggling watched status: \(error.localizedDescription)")
+                
+                await MainActor.run {
+                    isWatched = false
+                }
+            } else {
+                // Add to watched shows with any existing rating from FirestoreShow
+                let initialRating: Int? = userRating != nil ? Int(userRating!) : nil
+                
+                let watchedShow = WatchedShow(
+                    id: showId,
+                    title: firestoreShow.name,
+                    imageName: firestoreShow.posterPath ?? "",
+                    dateWatched: Date(),
+                    rating: initialRating
+                )
+                
+                try await ProfileManager.shared.addWatchedShow(userId: userId, show: watchedShow)
+                await MainActor.run {
+                    isWatched = true
+                    // Only show rating sheet if user hasn't rated yet
+                    showRateSheet = (initialRating == nil)
+                }
             }
-            
-            await MainActor.run {
-                isMarkingWatched = false
-            }
+        } catch {
+            print("Error toggling watched status: \(error.localizedDescription)")
         }
+        
+        isMarkingWatched = false
     }
 }
 
@@ -860,6 +873,7 @@ struct RateShowView: View {
     let show: FirestoreShow
     let userCurrentRating: Double?
     let onRatingSubmitted: (Double) -> Void
+    let isWatched: Bool
     
     @State private var rating: Double
     @State private var isSubmitting = false
@@ -869,10 +883,11 @@ struct RateShowView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authManager: AuthManager
     
-    init(show: FirestoreShow, userCurrentRating: Double? = nil, onRatingSubmitted: @escaping (Double) -> Void = { _ in }) {
+    init(show: FirestoreShow, userCurrentRating: Double? = nil, isWatched: Bool = false, onRatingSubmitted: @escaping (Double) -> Void = { _ in }) {
         self.show = show
         self.userCurrentRating = userCurrentRating
         self.onRatingSubmitted = onRatingSubmitted
+        self.isWatched = isWatched
         _rating = State(initialValue: userCurrentRating ?? 3.0)
     }
     
@@ -958,11 +973,21 @@ struct RateShowView: View {
         
         Task {
             do {
+                // Rate the show in FirestoreShowService
                 try await FirestoreShowService.shared.rateShow(
                     showId: showId,
                     userId: userId,
                     rating: rating
                 )
+                
+                // If show is in watched list, update its rating there too
+                if isWatched {
+                    try await ProfileManager.shared.updateWatchedShowRating(
+                        userId: userId,
+                        showId: showId,
+                        rating: Int(rating)
+                    )
+                }
                 
                 await MainActor.run {
                     successMessage = "Rating submitted successfully!"
