@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var selection: Tab = .home
     @State private var showSignInView: Bool = false
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var locationManager: LocationManager
 
     var body: some View {
         TabView(selection: $selection) {
