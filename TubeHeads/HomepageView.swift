@@ -13,21 +13,23 @@ struct HomepageView: View {
         NavigationStack {
             ZStack {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 16) {
                         Text("TubeHeads")
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .padding(.horizontal)
                         
-                        // Featured section could go here
+                        // Region-specific popular shows
+                        RegionalTVView()
+                            .padding(.top, 4)
                         
                         // Trending TV Shows
                         TrendingTVView()
-                            .padding(.top, 8)
+                            .padding(.top, 4)
                         
                         // More sections could be added here
                         
-                        Spacer(minLength: 60)
+                        Spacer(minLength: 40)
                     }
                     .padding(.top)
                 }

@@ -132,7 +132,12 @@ struct ShowDetailView: View {
                                     Image(systemName: star <= Int(userRating) ? "star.fill" : "star")
                                         .foregroundColor(.yellow)
                                         .onTapGesture {
-                                            userRating = Double(star)
+                                            // If tapping the same star that's already selected, clear the rating
+                                            if Double(star) == userRating {
+                                                userRating = 0
+                                            } else {
+                                                userRating = Double(star)
+                                            }
                                             submitRating()
                                         }
                                 }

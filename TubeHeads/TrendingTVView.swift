@@ -4,10 +4,10 @@ struct TrendingTVView: View {
     @StateObject private var viewModel = TrendingTVViewModel()
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Trending Shows")
-                    .font(.title2)
+                    .font(.headline)
                     .fontWeight(.bold)
                 
                 Spacer()
@@ -17,7 +17,8 @@ struct TrendingTVView: View {
                     Text("This Week").tag(TimeWindow.week)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 180)
+                .frame(width: 160)
+                .scaleEffect(0.9)
             }
             .padding(.horizontal)
             
@@ -25,7 +26,7 @@ struct TrendingTVView: View {
                 HStack {
                     Spacer()
                     ProgressView()
-                        .scaleEffect(1.5)
+                        .scaleEffect(1.0)
                         .padding()
                     Spacer()
                 }
@@ -33,21 +34,23 @@ struct TrendingTVView: View {
                 VStack {
                     Text("Error loading shows")
                         .foregroundColor(.red)
+                        .font(.caption)
                     Button("Try Again") {
                         Task {
                             await viewModel.loadTrendingShows()
                         }
                     }
-                    .padding()
+                    .padding(8)
                     .background(Color.blue)
                     .foregroundColor(.white)
                     .cornerRadius(8)
+                    .font(.caption)
                 }
                 .frame(maxWidth: .infinity)
-                .padding()
+                .padding(.vertical, 5)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 16) {
+                    LazyHStack(spacing: 12) {
                         ForEach(Array(viewModel.tvShows.enumerated()), id: \.element.id) { index, show in
                             NavigationLink(destination: 
                                 FirestoreShowDetailView(firestoreShow: FirestoreShow(
@@ -64,7 +67,9 @@ struct TrendingTVView: View {
                         }
                     }
                     .padding(.horizontal)
+                    .padding(.vertical, 5)
                 }
+                .frame(height: 215)
             }
         }
         .onAppear {
@@ -110,11 +115,11 @@ struct TVShowCard: View {
                     EmptyView()
                 }
             }
-            .frame(width: 150, height: 225)
-            .cornerRadius(8)
-            .shadow(radius: 3)
+            .frame(width: 120, height: 180)
+            .cornerRadius(6)
+            .shadow(radius: 2)
         }
-        .frame(width: 150)
+        .frame(width: 120)
     }
 }
 

@@ -342,6 +342,7 @@ struct ReviewCard: View {
         .sheet(isPresented: $showUserProfile) {
             NavigationView {
                 UserProfileView(userId: review.userId)
+                    .environmentObject(authManager)
             }
         }
     }
@@ -354,7 +355,7 @@ struct AddReviewView: View {
     @State private var userExistingRating: Double?
     
     @State private var reviewText = ""
-    @State private var rating: Double = 3
+    @State private var rating: Double = 0
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     
@@ -378,7 +379,11 @@ struct AddReviewView: View {
                                     .foregroundColor(.yellow)
                                     .onTapGesture {
                                         if userExistingRating == nil {
-                                            rating = Double(star)
+                                            if Double(star) == rating {
+                                                rating = 0
+                                            } else {
+                                                rating = Double(star)
+                                            }
                                         }
                                     }
                             }
@@ -412,18 +417,23 @@ struct AddReviewView: View {
                     }
                 }
                 
-                Section {
-                    Button(action: submitReview) {
-                        if isSubmitting {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle())
-                        } else {
-                            Text("Submit Review")
-                        }
+                Button(action: {
+                    submitReview()
+                }) {
+                    if isSubmitting {
+                        ProgressView()
+                    } else {
+                        Text("Submit Review")
+                            .fontWeight(.bold)
                     }
-                    .frame(maxWidth: .infinity)
-                    .disabled(reviewText.isEmpty || isSubmitting)
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 10)
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(8)
+                .padding(.top)
+                .disabled(isSubmitting || reviewText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || rating == 0)
             }
             .navigationTitle("Write a Review")
             .navigationBarTitleDisplayMode(.inline)
@@ -531,7 +541,12 @@ struct EditReviewView: View {
                                 Image(systemName: star <= Int(rating) ? "star.fill" : "star")
                                     .foregroundColor(.yellow)
                                     .onTapGesture {
-                                        rating = Double(star)
+                                        // If tapping the same star that's already selected, clear the rating
+                                        if Double(star) == rating {
+                                            rating = 0
+                                        } else {
+                                            rating = Double(star)
+                                        }
                                     }
                             }
                         }

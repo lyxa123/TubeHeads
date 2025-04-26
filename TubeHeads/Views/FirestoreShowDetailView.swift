@@ -302,7 +302,7 @@ struct FirestoreShowDetailView: View {
             .environmentObject(authManager)
         }
         .sheet(isPresented: $showRateSheet) {
-            RateShowView(
+            RatingView(
                 show: firestoreShow, 
                 userCurrentRating: userRating,
                 onRatingSubmitted: { newRating in
@@ -856,24 +856,28 @@ struct AddToListView: View {
 }
 
 // Simple rating view for rating without review
-struct RateShowView: View {
+struct RatingView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var authManager: AuthManager
+    
     let show: FirestoreShow
     let userCurrentRating: Double?
     let onRatingSubmitted: (Double) -> Void
     
-    @State private var rating: Double
+    @State private var rating: Double = 0 // Change default to 0 instead of 3
+    @State private var previousRating: Double = 0 // Track the previous rating for toggling
     @State private var isSubmitting = false
     @State private var successMessage: String?
     @State private var errorMessage: String?
-    
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var authManager: AuthManager
     
     init(show: FirestoreShow, userCurrentRating: Double? = nil, onRatingSubmitted: @escaping (Double) -> Void = { _ in }) {
         self.show = show
         self.userCurrentRating = userCurrentRating
         self.onRatingSubmitted = onRatingSubmitted
-        _rating = State(initialValue: userCurrentRating ?? 3.0)
+        
+        // Initialize with user's current rating or 0 (not 3)
+        _rating = State(initialValue: userCurrentRating ?? 0)
+        _previousRating = State(initialValue: userCurrentRating ?? 0) // Store the initial rating
     }
     
     var body: some View {
@@ -897,7 +901,12 @@ struct RateShowView: View {
                             .font(.system(size: 36))
                             .foregroundColor(.yellow)
                             .onTapGesture {
-                                rating = Double(star)
+                                // If tapping the same star that's already selected, clear the rating
+                                if Double(star) == rating {
+                                    rating = 0
+                                } else {
+                                    rating = Double(star)
+                                }
                             }
                     }
                 }
@@ -935,7 +944,7 @@ struct RateShowView: View {
                             .cornerRadius(10)
                     }
                 }
-                .disabled(isSubmitting)
+                .disabled(isSubmitting || rating == 0) // Disable if no rating selected
                 .padding(.horizontal)
                 
                 Spacer()
