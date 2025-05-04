@@ -695,6 +695,9 @@ struct ListDetailView: View {
     @State private var selectedShows: Set<String> = []
     @State private var showingPrivacyConfirmation = false
     @State private var showingDeleteConfirmation = false
+    @State private var randomShow: FirestoreShow? = nil
+    @State private var showingRandomShow = false
+    @State private var isSpinningRoulette = false
     @EnvironmentObject private var authManager: AuthManager
     
     init(list: ShowList) {
@@ -728,6 +731,31 @@ struct ListDetailView: View {
                         Text("Created \(list.formattedDate)")
                             .font(.caption)
                             .foregroundColor(.gray)
+                    }
+                    
+                    // Add roulette button if there are shows
+                    if !shows.isEmpty {
+                        Button(action: pickRandomShow) {
+                            Label("Roulette", systemImage: "dice.fill")
+                                .font(.headline)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                                .padding(.top, 8)
+                                .scaleEffect(isSpinningRoulette ? 1.1 : 1.0)
+                                .rotation3DEffect(
+                                    .degrees(isSpinningRoulette ? 360 : 0),
+                                    axis: (x: 0, y: 1, z: 0)
+                                )
+                                .animation(
+                                    isSpinningRoulette ? 
+                                        .easeInOut(duration: 0.5).repeatCount(3, autoreverses: false) : 
+                                        .default,
+                                    value: isSpinningRoulette
+                                )
+                        }
                     }
                 }
                 .padding()
@@ -801,7 +829,8 @@ struct ListDetailView: View {
                     }) {
                         Text("Done")
                     }
-                } else {
+                } else if authManager.currentUser?.uid == list.userId {
+                    // Only show menu if user owns the list
                     Menu {
                         Button(action: {
                             isEditMode = true
@@ -825,7 +854,7 @@ struct ListDetailView: View {
             VStack {
                 Spacer()
                 
-                if isEditMode && !selectedShows.isEmpty {
+                if isEditMode && !selectedShows.isEmpty && authManager.currentUser?.uid == list.userId {
                     HStack {
                         Button(action: {
                             showingDeleteConfirmation = true
@@ -874,6 +903,18 @@ struct ListDetailView: View {
         }
         .task {
             await fetchShowsData(listId: list.id ?? "")
+        }
+        .sheet(isPresented: $showingRandomShow, onDismiss: {
+            randomShow = nil
+        }) {
+            if let show = randomShow {
+                NavigationView {
+                    FirestoreShowDetailView(firestoreShow: show)
+                        .navigationBarItems(trailing: Button("Close") {
+                            showingRandomShow = false
+                        })
+                }
+            }
         }
     }
     
@@ -928,6 +969,12 @@ struct ListDetailView: View {
     private func removeSelectedShows() {
         guard let listId = list.id else { return }
         
+        // Verify user ownership before allowing removal
+        guard authManager.currentUser?.uid == list.userId else {
+            print("Error: User does not own this list and cannot remove shows")
+            return
+        }
+        
         // Capture the selected shows for removal
         let showsToRemove = selectedShows
         
@@ -980,6 +1027,12 @@ struct ListDetailView: View {
     private func toggleListPrivacy() {
         guard let listId = list.id else { return }
         
+        // Verify user ownership before allowing privacy changes
+        guard authManager.currentUser?.uid == list.userId else {
+            print("Error: User does not own this list and cannot change privacy settings")
+            return
+        }
+        
         // Toggle local state first for immediate UI feedback
         list.isPrivate.toggle()
         
@@ -994,6 +1047,22 @@ struct ListDetailView: View {
                     print("Error updating list privacy: \(error)")
                 }
             }
+        }
+    }
+    
+    private func pickRandomShow() {
+        guard !shows.isEmpty else { return }
+        
+        // Start animation
+        isSpinningRoulette = true
+        
+        // Schedule showing the random show after animation completes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            // Pick a random show
+            let randomIndex = Int.random(in: 0..<shows.count)
+            randomShow = shows[randomIndex]
+            showingRandomShow = true
+            isSpinningRoulette = false
         }
     }
 }
