@@ -609,6 +609,28 @@ struct ProfileView: View {
                 }
                 .padding(.vertical, 8)
                 
+                Divider()
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                
+                // Liked Lists section
+                NavigationLink(destination: LikedListsView()) {
+                    HStack {
+                        Text("Liked Lists")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
                 Spacer()
             }
             .padding(.top)
@@ -1747,5 +1769,185 @@ struct WatchedShowsView: View {
 struct ProfileView_Previews: PreviewProvider {
     static var previews: some View {
         ProfileView()
+    }
+}
+
+// View to show user's liked lists
+struct LikedListsView: View {
+    @State private var likedLists: [ShowList] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String? = nil
+    @EnvironmentObject private var authManager: AuthManager
+    
+    var body: some View {
+        VStack {
+            if isLoading {
+                ProgressView()
+                    .scaleEffect(1.5)
+                    .padding()
+            } else if let error = errorMessage {
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundColor(.orange)
+                        .padding()
+                    
+                    Text("Error Loading Lists")
+                        .font(.headline)
+                    
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    Button("Try Again") {
+                        loadLikedLists()
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+                .padding()
+            } else if likedLists.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "heart")
+                        .font(.system(size: 60))
+                        .foregroundColor(.gray.opacity(0.6))
+                        .padding(.top, 60)
+                    
+                    Text("No liked lists yet")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    Text("Lists you like from other users will appear here")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .padding()
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(likedLists) { list in
+                            NavigationLink(destination: UserListView(listId: list.id ?? "", listName: list.name)) {
+                                LikedListRow(list: list)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(.vertical)
+                }
+            }
+        }
+        .navigationTitle("Liked Lists")
+        .task {
+            loadLikedLists()
+        }
+    }
+    
+    private func loadLikedLists() {
+        guard let userId = authManager.currentUser?.uid else { return }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                let lists = try await ListService.shared.getLikedLists(userId: userId)
+                
+                await MainActor.run {
+                    self.likedLists = lists
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                    self.isLoading = false
+                }
+            }
+        }
+    }
+}
+
+struct LikedListRow: View {
+    let list: ShowList
+    @State private var creatorUsername: String = ""
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // List icon with heart
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.red.opacity(0.1))
+                    .frame(width: 45, height: 45)
+                
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.red)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                // List name
+                Text(list.name)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                    .foregroundColor(.primary)
+                
+                // List description
+                if !list.description.isEmpty {
+                    Text(list.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                
+                // Show count and creator
+                HStack {
+                    Text("\(list.showIds.count) shows")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                    
+                    Text("•")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    
+                    Text("Created by \(creatorUsername.isEmpty ? "User" : creatorUsername)")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(.gray)
+                .padding(.trailing, 4)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
+        .padding(.horizontal)
+        .onAppear {
+            loadCreatorUsername()
+        }
+    }
+    
+    private func loadCreatorUsername() {
+        Task {
+            do {
+                let profile = try await ProfileManager.shared.getProfile(userId: list.userId)
+                await MainActor.run {
+                    creatorUsername = profile.username
+                }
+            } catch {
+                print("Error loading creator username: \(error)")
+            }
+        }
     }
 } 
