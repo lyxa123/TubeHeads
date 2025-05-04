@@ -613,24 +613,6 @@ struct ProfileView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                 
-                // Liked Lists section
-                NavigationLink(destination: LikedListsView()) {
-                    HStack {
-                        Text("Liked Lists")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.gray)
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                }
-                .buttonStyle(PlainButtonStyle())
-                
                 Spacer()
             }
             .padding(.top)

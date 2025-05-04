@@ -413,6 +413,7 @@ struct UserListView: View {
     @State private var shows: [FirestoreShow] = []
     @State private var isLoading = true
     @State private var errorMessage: String? = nil
+    @EnvironmentObject private var authManager: AuthManager
     
     var body: some View {
         VStack {
@@ -500,29 +501,15 @@ struct UserListView: View {
         isLoading = true
         
         do {
-            // First get the list
-            let list = try await ListService.shared.getList(id: listId)
-            
-            var listShows: [FirestoreShow] = []
-            
-            // Load each show in the list
-            for showId in list.showIds {
-                do {
-                    let show = try await FirestoreShowService.shared.getShow(id: showId)
-                    listShows.append(show)
-                } catch {
-                    print("Error loading show \(showId): \(error.localizedDescription)")
-                }
-            }
-            
+            let shows = try await ListService.shared.getShowsInList(listId: listId)
             await MainActor.run {
-                self.shows = listShows
-                self.isLoading = false
+                self.shows = shows
+                isLoading = false
             }
         } catch {
             await MainActor.run {
-                self.errorMessage = error.localizedDescription
-                self.isLoading = false
+                errorMessage = error.localizedDescription
+                isLoading = false
             }
         }
     }

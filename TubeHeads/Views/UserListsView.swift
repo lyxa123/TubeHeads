@@ -43,14 +43,6 @@ struct UserListsView: View {
                     }
                     
                     Spacer()
-                    
-                    Button(action: {
-                        // Search action
-                    }) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.primary)
-                    }
-                    .padding(.horizontal)
                 }
                 .padding(.horizontal)
             }
@@ -167,10 +159,12 @@ struct UserListsView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if selectedFilter == .yourList && userId == nil {
-                    Button(action: {
-                        showCreateListSheet = true
-                    }) {
-                        Image(systemName: "plus")
+                    HStack {
+                        Button(action: {
+                            showCreateListSheet = true
+                        }) {
+                            Image(systemName: "plus")
+                        }
                     }
                 }
             }
