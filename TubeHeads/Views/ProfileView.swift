@@ -521,12 +521,12 @@ struct ProfileView: View {
                         
                         Spacer()
                         
-                        Button(action: {
-                            // View all watched shows
-                        }) {
-                            Text("See All")
-                                .font(.subheadline)
-                                .foregroundColor(.blue)
+                        if watchedShows.count > 3 {
+                            NavigationLink(destination: WatchedShowsView(shows: watchedShows)) {
+                                Text("See All")
+                                    .font(.subheadline)
+                                    .foregroundColor(.blue)
+                            }
                         }
                     }
                     .padding(.horizontal)
@@ -540,7 +540,7 @@ struct ProfileView: View {
                             .padding()
                     } else {
                         // Only show up to 3 items in the preview
-                        let previewShows = Array(watchedShows.prefix(3))
+                        let previewShows = Array(watchedShows.sorted(by: { $0.dateWatched > $1.dateWatched }).prefix(3))
                         
                         VStack(spacing: 10) {
                             ForEach(previewShows) { show in
@@ -1589,6 +1589,82 @@ struct PublicListRow: View {
                 isLoading = false
             }
         }
+    }
+}
+
+// View to show all watched shows
+struct WatchedShowsView: View {
+    let shows: [WatchedShow]
+    @State private var sortOption: SortOption = .dateNewest
+    
+    enum SortOption {
+        case dateNewest
+        case dateOldest
+        case titleAZ
+        case ratingHighest
+    }
+    
+    var sortedShows: [WatchedShow] {
+        switch sortOption {
+        case .dateNewest:
+            return shows.sorted(by: { $0.dateWatched > $1.dateWatched })
+        case .dateOldest:
+            return shows.sorted(by: { $0.dateWatched < $1.dateWatched })
+        case .titleAZ:
+            return shows.sorted(by: { $0.title < $1.title })
+        case .ratingHighest:
+            return shows.sorted { 
+                let rating1 = $0.rating ?? 0
+                let rating2 = $1.rating ?? 0
+                return rating1 > rating2
+            }
+        }
+    }
+    
+    var body: some View {
+        VStack {
+            if shows.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "tv")
+                        .font(.system(size: 60))
+                        .foregroundColor(.gray.opacity(0.6))
+                        .padding(.top, 60)
+                    
+                    Text("No watched shows yet")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    Text("Shows you mark as watched will appear here")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .padding()
+            } else {
+                // Sort picker
+                Picker("Sort by", selection: $sortOption) {
+                    Text("Newest First").tag(SortOption.dateNewest)
+                    Text("Oldest First").tag(SortOption.dateOldest)
+                    Text("Title A-Z").tag(SortOption.titleAZ)
+                    Text("Highest Rated").tag(SortOption.ratingHighest)
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(sortedShows) { show in
+                            WatchedShowRow(show: show)
+                                .padding(.horizontal)
+                        }
+                    }
+                    .padding(.vertical)
+                }
+            }
+        }
+        .navigationTitle("Watched Shows")
     }
 }
 

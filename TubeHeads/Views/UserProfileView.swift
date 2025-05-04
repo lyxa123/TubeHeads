@@ -31,9 +31,10 @@ struct UserProfileView: View {
                             .foregroundColor(.primary)
                     }
                     
-                    Text("Profile")
+                    Text(isLoading ? "User's Profile" : "\(username)'s Profile")
                         .font(.title2)
                         .fontWeight(.bold)
+                        .lineLimit(1)
                     
                     Spacer()
                 }
@@ -50,6 +51,13 @@ struct UserProfileView: View {
                         Image(systemName: "lock.fill")
                             .font(.caption)
                             .foregroundColor(.red)
+                    }
+                    
+                    Spacer()
+                    
+                    // Only show follow button if viewing someone else's profile
+                    if let currentUserId = authManager.currentUser?.uid, currentUserId != userId {
+                        FollowButton(userId: userId)
                     }
                 }
                 .padding(.horizontal)
@@ -117,10 +125,8 @@ struct UserProfileView: View {
                                 
                                 Spacer()
                                 
-                                if watchedShows.count > 5 {
-                                    Button(action: {
-                                        // View all watched shows
-                                    }) {
+                                if watchedShows.count > 3 {
+                                    NavigationLink(destination: WatchedShowsView(shows: watchedShows)) {
                                         Text("See All")
                                             .font(.subheadline)
                                             .foregroundColor(.blue)
@@ -129,11 +135,11 @@ struct UserProfileView: View {
                             }
                             .padding(.horizontal)
                             
-                            ForEach(watchedShows.sorted(by: { $0.dateWatched > $1.dateWatched }).prefix(5)) { show in
+                            ForEach(watchedShows.sorted(by: { $0.dateWatched > $1.dateWatched }).prefix(3)) { show in
                                 WatchedShowRow(show: show)
                                     .padding(.horizontal)
                                 
-                                if show.id != watchedShows.sorted(by: { $0.dateWatched > $1.dateWatched }).prefix(5).last?.id {
+                                if show.id != watchedShows.sorted(by: { $0.dateWatched > $1.dateWatched }).prefix(3).last?.id {
                                     Divider()
                                         .padding(.horizontal)
                                 }
@@ -162,9 +168,7 @@ struct UserProfileView: View {
                                 Spacer()
                                 
                                 if userLists.count > 3 {
-                                    Button(action: {
-                                        // View all lists
-                                    }) {
+                                    NavigationLink(destination: UserListsView(userId: userId)) {
                                         Text("See All")
                                             .font(.subheadline)
                                             .foregroundColor(.blue)
@@ -453,6 +457,106 @@ struct UserListView: View {
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
                 self.isLoading = false
+            }
+        }
+    }
+}
+
+// FollowButton component for user profiles
+struct FollowButton: View {
+    let userId: String
+    @State private var isFollowing = false
+    @State private var isLoading = false
+    @EnvironmentObject private var authManager: AuthManager
+    
+    var body: some View {
+        Button(action: {
+            toggleFollow()
+        }) {
+            HStack(spacing: 5) {
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                } else {
+                    Image(systemName: isFollowing ? "person.badge.minus" : "person.badge.plus")
+                        .font(.caption)
+                }
+                
+                Text(isFollowing ? "Following" : "Follow")
+                    .font(.footnote)
+                    .fontWeight(.medium)
+            }
+            .padding(.vertical, 6)
+            .padding(.horizontal, 12)
+            .background(isFollowing ? Color.gray.opacity(0.2) : Color.blue.opacity(0.8))
+            .foregroundColor(isFollowing ? .primary : .white)
+            .cornerRadius(15)
+        }
+        .disabled(isLoading)
+        .onAppear {
+            checkFollowStatus()
+        }
+    }
+    
+    private func checkFollowStatus() {
+        guard let currentUserId = authManager.currentUser?.uid else { return }
+        
+        isLoading = true
+        
+        // Here you would check if the current user is following this user
+        // For demonstration, we'll simulate an API call
+        Task {
+            do {
+                // Simulated check - in a real app, you'd query Firestore
+                // to check if currentUserId follows userId
+                try await Task.sleep(nanoseconds: 500_000_000) // 0.5 sec delay
+                
+                // This would be a Firestore query in a real implementation
+                let followsDoc = try? await Firestore.firestore()
+                    .collection("follows")
+                    .document(currentUserId)
+                    .getDocument()
+                
+                let isFollowing = followsDoc?.data()?["following"] as? [String] ?? []
+                
+                await MainActor.run {
+                    self.isFollowing = isFollowing.contains(userId)
+                    self.isLoading = false
+                }
+            } catch {
+                print("Error checking follow status: \(error)")
+                await MainActor.run {
+                    self.isLoading = false
+                }
+            }
+        }
+    }
+    
+    private func toggleFollow() {
+        guard let currentUserId = authManager.currentUser?.uid else { return }
+        
+        isLoading = true
+        
+        Task {
+            do {
+                // In a real app, this would update Firestore to add/remove the follow relationship
+                if isFollowing {
+                    // Unfollow logic would go here
+                    try await Task.sleep(nanoseconds: 800_000_000) // Simulate network delay
+                } else {
+                    // Follow logic would go here
+                    try await Task.sleep(nanoseconds: 800_000_000) // Simulate network delay
+                }
+                
+                await MainActor.run {
+                    self.isFollowing.toggle()
+                    self.isLoading = false
+                }
+            } catch {
+                print("Error toggling follow status: \(error)")
+                await MainActor.run {
+                    self.isLoading = false
+                }
             }
         }
     }
