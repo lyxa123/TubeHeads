@@ -9,6 +9,9 @@ struct UserListsView: View {
     @State private var showCreateListSheet = false
     @State private var selectedFilter: ListFilter = .yourList
     
+    // Add optional userId parameter
+    var userId: String?
+    
     enum ListFilter: String, CaseIterable {
         case yourList = "Your List"
         case likedList = "Liked List"
@@ -16,32 +19,34 @@ struct UserListsView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Filter tabs
-            HStack(spacing: 0) {
-                ForEach(ListFilter.allCases, id: \.self) { filter in
-                    Button(action: {
-                        selectedFilter = filter
-                    }) {
-                        Text(filter.rawValue)
-                            .fontWeight(selectedFilter == filter ? .semibold : .regular)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 20)
+            // Filter tabs - only show when viewing own lists
+            if userId == nil {
+                HStack(spacing: 0) {
+                    ForEach(ListFilter.allCases, id: \.self) { filter in
+                        Button(action: {
+                            selectedFilter = filter
+                        }) {
+                            Text(filter.rawValue)
+                                .fontWeight(selectedFilter == filter ? .semibold : .regular)
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 20)
+                        }
+                        .background(selectedFilter == filter ? Color.gray.opacity(0.2) : Color.clear)
+                        .cornerRadius(4)
                     }
-                    .background(selectedFilter == filter ? Color.gray.opacity(0.2) : Color.clear)
-                    .cornerRadius(4)
-                }
-                
-                Spacer()
-                
-                Button(action: {
-                    // Search action
-                }) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        // Search action
+                    }) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.primary)
+                    }
+                    .padding(.horizontal)
                 }
                 .padding(.horizontal)
             }
-            .padding(.horizontal)
             
             if isLoading {
                 ProgressView("Loading lists...")
@@ -73,26 +78,37 @@ struct UserListsView: View {
                         .font(.system(size: 60))
                         .foregroundColor(.gray)
                     
-                    Text("You haven't created any lists yet")
-                        .font(.title3)
-                        .fontWeight(.medium)
-                    
-                    Text("Create your first list to keep track of TV shows you want to watch or ones you love.")
-                        .multilineTextAlignment(.center)
-                        .foregroundColor(.gray)
-                        .padding(.horizontal)
-                    
-                    Button(action: {
-                        showCreateListSheet = true
-                    }) {
-                        HStack {
-                            Image(systemName: "plus.circle.fill")
-                            Text("Create List")
+                    if userId != nil {
+                        Text("This user has no public lists")
+                            .font(.title3)
+                            .fontWeight(.medium)
+                        
+                        Text("When they create public lists, they will appear here.")
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.gray)
+                            .padding(.horizontal)
+                    } else {
+                        Text("You haven't created any lists yet")
+                            .font(.title3)
+                            .fontWeight(.medium)
+                        
+                        Text("Create your first list to keep track of TV shows you want to watch or ones you love.")
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.gray)
+                            .padding(.horizontal)
+                        
+                        Button(action: {
+                            showCreateListSheet = true
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Create List")
+                            }
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
                         }
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
                     }
                 }
                 .padding()
@@ -111,10 +127,10 @@ struct UserListsView: View {
                 }
             }
         }
-        .navigationTitle("Lists")
+        .navigationTitle(userId == nil ? "Lists" : "User's Lists")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                if selectedFilter == .yourList {
+                if selectedFilter == .yourList && userId == nil {
                     Button(action: {
                         showCreateListSheet = true
                     }) {
@@ -136,7 +152,10 @@ struct UserListsView: View {
     }
     
     private func loadUserLists() async {
-        guard let userId = authManager.currentUser?.uid else {
+        // If userId is provided, use that; otherwise use current user's ID
+        let targetUserId = userId ?? authManager.currentUser?.uid
+        
+        guard let userIdToLoad = targetUserId else {
             isLoading = false
             errorMessage = "You must be signed in to view lists"
             return
@@ -146,8 +165,14 @@ struct UserListsView: View {
         errorMessage = nil
         
         do {
-            if selectedFilter == .yourList {
-                userLists = try await ListService.shared.getUserLists(userId: userId)
+            // When viewing another user's lists, we only want to see public lists
+            if userId != nil {
+                // Load other user's public lists
+                let allLists = try await ListService.shared.getUserLists(userId: userIdToLoad)
+                userLists = allLists.filter { !$0.isPrivate }
+            } else if selectedFilter == .yourList {
+                // Load current user's lists (both public and private)
+                userLists = try await ListService.shared.getUserLists(userId: userIdToLoad)
             } else {
                 // TODO: Implement liked lists logic when available
                 userLists = []
