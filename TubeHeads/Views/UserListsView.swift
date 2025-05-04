@@ -26,14 +26,19 @@ struct UserListsView: View {
                 HStack(spacing: 0) {
                     ForEach(ListFilter.allCases, id: \.self) { filter in
                         Button(action: {
-                            selectedFilter = filter
+                            if selectedFilter != filter {
+                                selectedFilter = filter
+                                Task {
+                                    await loadUserLists()
+                                }
+                            }
                         }) {
                             Text(filter.rawValue)
                                 .fontWeight(selectedFilter == filter ? .semibold : .regular)
                                 .padding(.vertical, 10)
                                 .padding(.horizontal, 20)
                         }
-                        .background(selectedFilter == filter ? Color.gray.opacity(0.2) : Color.clear)
+                        .background(selectedFilter == filter ? Color.blue.opacity(0.2) : Color.clear)
                         .cornerRadius(4)
                     }
                     
@@ -115,12 +120,29 @@ struct UserListsView: View {
                 }
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if userLists.isEmpty && selectedFilter == .likedList {
+                VStack(spacing: 20) {
+                    Image(systemName: "heart")
+                        .font(.system(size: 60))
+                        .foregroundColor(.gray)
+                    
+                    Text("No liked lists yet")
+                        .font(.title3)
+                        .fontWeight(.medium)
+                    
+                    Text("Lists you like from other users will appear here.")
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.gray)
+                        .padding(.horizontal)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // List content
                 ScrollView {
                     VStack(spacing: 20) {
                         // Watched Shows section (shown as a list)
-                        if !watchedShows.isEmpty && (userId == nil || (userId != nil && userId == authManager.currentUser?.uid)) {
+                        if !watchedShows.isEmpty && (userId == nil || (userId != nil && userId == authManager.currentUser?.uid)) && selectedFilter == .yourList {
                             NavigationLink(destination: WatchedShowsView(shows: watchedShows)) {
                                 WatchedShowsListCard(watchedShows: watchedShows)
                             }
@@ -129,7 +151,11 @@ struct UserListsView: View {
                         // User-created lists
                         ForEach(userLists) { list in
                             NavigationLink(destination: ListDetailView(list: list)) {
-                                ListCardView(list: list)
+                                if selectedFilter == .likedList {
+                                    LikedListCardView(list: list)
+                                } else {
+                                    ListCardView(list: list)
+                                }
                             }
                         }
                     }
@@ -189,8 +215,8 @@ struct UserListsView: View {
                 // Load current user's lists (both public and private)
                 userLists = try await ListService.shared.getUserLists(userId: userIdToLoad)
             } else {
-                // TODO: Implement liked lists logic when available
-                userLists = []
+                // Load current user's liked lists
+                userLists = try await ListService.shared.getLikedLists(userId: userIdToLoad)
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -430,6 +456,147 @@ struct ListCardView: View {
         }
         
         isLoading = false
+    }
+}
+
+struct LikedListCardView: View {
+    let list: ShowList
+    @State private var listShows: [FirestoreShow] = []
+    @State private var isLoading = true
+    @State private var creatorUsername: String = ""
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Title with heart icon for liked lists
+            HStack {
+                Text(list.name)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Image(systemName: "heart.fill")
+                    .foregroundColor(.red)
+                    .font(.caption)
+                
+                Spacer()
+            }
+            
+            // Description
+            Text(list.description)
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .lineLimit(2)
+            
+            // Creator info
+            if !creatorUsername.isEmpty {
+                Text("Created by: \(creatorUsername)")
+                    .font(.caption)
+                    .foregroundColor(.blue)
+            }
+            
+            // Show preview images (if available)
+            if isLoading {
+                HStack {
+                    ForEach(0..<3, id: \.self) { _ in
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(width: 80, height: 120)
+                            .cornerRadius(6)
+                    }
+                }
+            } else if !listShows.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(listShows.prefix(4)) { show in
+                            if let posterURL = show.posterURL {
+                                AsyncImage(url: posterURL) { phase in
+                                    switch phase {
+                                    case .empty:
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.3))
+                                            .frame(width: 80, height: 120)
+                                            .cornerRadius(6)
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 80, height: 120)
+                                            .cornerRadius(6)
+                                    case .failure:
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.3))
+                                            .frame(width: 80, height: 120)
+                                            .cornerRadius(6)
+                                            .overlay(
+                                                Image(systemName: "photo")
+                                                    .foregroundColor(.gray)
+                                            )
+                                    @unknown default:
+                                        EmptyView()
+                                    }
+                                }
+                            } else {
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 80, height: 120)
+                                    .cornerRadius(6)
+                                    .overlay(
+                                        Image(systemName: "tv")
+                                            .foregroundColor(.gray)
+                                    )
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text("This list is empty")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.vertical)
+            }
+            
+            // Last updated date
+            Text("Updated \(list.formattedDate)")
+                .font(.caption)
+                .foregroundColor(.gray)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .onAppear {
+            Task {
+                await loadListShows()
+                await loadCreatorUsername()
+            }
+        }
+    }
+    
+    private func loadListShows() async {
+        isLoading = true
+        
+        do {
+            let shows = try await ListService.shared.getShowsInList(listId: list.id ?? "")
+            await MainActor.run {
+                listShows = shows
+                isLoading = false
+            }
+        } catch {
+            print("Error loading shows for list: \(error)")
+            await MainActor.run {
+                isLoading = false
+            }
+        }
+    }
+    
+    private func loadCreatorUsername() async {
+        do {
+            let profile = try await ProfileManager.shared.getProfile(userId: list.userId)
+            await MainActor.run {
+                creatorUsername = profile.username
+            }
+        } catch {
+            print("Error loading creator username: \(error)")
+        }
     }
 }
 

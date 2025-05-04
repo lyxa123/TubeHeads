@@ -181,6 +181,7 @@ struct UserProfileView: View {
                                 if !list.isPrivate {
                                     NavigationLink(destination: UserListView(listId: list.id, listName: list.name)) {
                                         ShowListRow(list: list)
+                                            .environmentObject(authManager)
                                     }
                                     .buttonStyle(PlainButtonStyle())
                                 }
@@ -290,6 +291,9 @@ struct UserProfileView: View {
 
 struct ShowListRow: View {
     let list: (id: String, name: String, description: String, isPrivate: Bool, userId: String, showIds: [String])
+    @State private var isLiked = false
+    @State private var isLoading = false
+    @EnvironmentObject private var authManager: AuthManager
     
     var body: some View {
         HStack(spacing: 12) {
@@ -328,6 +332,28 @@ struct ShowListRow: View {
             
             Spacer()
             
+            // Add Like Button
+            if let currentUserId = authManager.currentUser?.uid, currentUserId != list.userId {
+                Button(action: {
+                    toggleLike()
+                }) {
+                    ZStack {
+                        if isLoading {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        } else {
+                            Image(systemName: isLiked ? "heart.fill" : "heart")
+                                .foregroundColor(isLiked ? .red : .gray)
+                                .font(.system(size: 18))
+                        }
+                    }
+                    .frame(width: 24, height: 24)
+                }
+                .buttonStyle(BorderlessButtonStyle())
+                .disabled(isLoading)
+                .padding(.trailing, 8)
+            }
+            
             Image(systemName: "chevron.right")
                 .font(.caption)
                 .foregroundColor(.gray)
@@ -338,6 +364,46 @@ struct ShowListRow: View {
         .background(Color(.systemGray6))
         .cornerRadius(10)
         .padding(.horizontal)
+        .onAppear {
+            checkLikeStatus()
+        }
+    }
+    
+    private func checkLikeStatus() {
+        guard let currentUserId = authManager.currentUser?.uid else { return }
+        
+        Task {
+            do {
+                isLiked = try await ListService.shared.isListLiked(listId: list.id, userId: currentUserId)
+            } catch {
+                print("Error checking like status: \(error)")
+            }
+        }
+    }
+    
+    private func toggleLike() {
+        guard let currentUserId = authManager.currentUser?.uid else { return }
+        isLoading = true
+        
+        Task {
+            do {
+                if isLiked {
+                    try await ListService.shared.unlikeList(listId: list.id, userId: currentUserId)
+                } else {
+                    try await ListService.shared.likeList(listId: list.id, userId: currentUserId)
+                }
+                
+                await MainActor.run {
+                    isLiked.toggle()
+                    isLoading = false
+                }
+            } catch {
+                print("Error toggling like: \(error)")
+                await MainActor.run {
+                    isLoading = false
+                }
+            }
+        }
     }
 }
 
