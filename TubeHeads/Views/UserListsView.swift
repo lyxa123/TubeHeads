@@ -8,6 +8,8 @@ struct UserListsView: View {
     @State private var errorMessage: String?
     @State private var showCreateListSheet = false
     @State private var selectedFilter: ListFilter = .yourList
+    @State private var watchedShows: [WatchedShow] = []
+    @State private var isLoadingWatchedShows = false
     
     // Add optional userId parameter
     var userId: String?
@@ -62,7 +64,7 @@ struct UserListsView: View {
                     
                     Button("Try Again") {
                         Task {
-                            await loadUserLists()
+                            await loadUserData()
                         }
                     }
                     .padding()
@@ -72,7 +74,7 @@ struct UserListsView: View {
                 }
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if userLists.isEmpty && selectedFilter == .yourList {
+            } else if userLists.isEmpty && watchedShows.isEmpty && selectedFilter == .yourList {
                 VStack(spacing: 20) {
                     Image(systemName: "list.bullet.clipboard")
                         .font(.system(size: 60))
@@ -117,6 +119,14 @@ struct UserListsView: View {
                 // List content
                 ScrollView {
                     VStack(spacing: 20) {
+                        // Watched Shows section (shown as a list)
+                        if !watchedShows.isEmpty && (userId == nil || (userId != nil && userId == authManager.currentUser?.uid)) {
+                            NavigationLink(destination: WatchedShowsView(shows: watchedShows)) {
+                                WatchedShowsListCard(watchedShows: watchedShows)
+                            }
+                        }
+                        
+                        // User-created lists
                         ForEach(userLists) { list in
                             NavigationLink(destination: ListDetailView(list: list)) {
                                 ListCardView(list: list)
@@ -141,7 +151,7 @@ struct UserListsView: View {
         }
         .onAppear {
             Task {
-                await loadUserLists()
+                await loadUserData()
             }
         }
         .sheet(isPresented: $showCreateListSheet) {
@@ -149,6 +159,11 @@ struct UserListsView: View {
                 userLists.insert(newList, at: 0)
             })
         }
+    }
+    
+    private func loadUserData() async {
+        await loadUserLists()
+        await loadWatchedShows()
     }
     
     private func loadUserLists() async {
@@ -183,6 +198,123 @@ struct UserListsView: View {
         }
         
         isLoading = false
+    }
+    
+    private func loadWatchedShows() async {
+        // If userId is provided, use that; otherwise use current user's ID
+        let targetUserId = userId ?? authManager.currentUser?.uid
+        
+        guard let userIdToLoad = targetUserId else {
+            return
+        }
+        
+        isLoadingWatchedShows = true
+        
+        do {
+            let profile = try await ProfileManager.shared.getProfile(userId: userIdToLoad)
+            await MainActor.run {
+                watchedShows = profile.watchedShows.sorted(by: { $0.dateWatched > $1.dateWatched })
+                isLoadingWatchedShows = false
+            }
+        } catch {
+            print("Error loading watched shows: \(error)")
+            await MainActor.run {
+                isLoadingWatchedShows = false
+            }
+        }
+    }
+}
+
+// New component for displaying Watched Shows as a list card
+struct WatchedShowsListCard: View {
+    let watchedShows: [WatchedShow]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Title with eye icon to indicate watched shows
+            HStack {
+                Text("Watched Shows")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Image(systemName: "eye.fill")
+                    .foregroundColor(.blue)
+                    .font(.caption)
+                
+                Spacer()
+                
+                Text("Updated \(formattedLatestWatchDate)")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            
+            // Description
+            Text("Shows you've watched")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .lineLimit(2)
+            
+            // Show preview images
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(watchedShows.prefix(4)) { show in
+                        if let imageName = show.imageName, !imageName.isEmpty {
+                            AsyncImage(url: URL(string: "https://image.tmdb.org/t/p/w200\(imageName)")) { phase in
+                                switch phase {
+                                case .empty:
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.3))
+                                        .frame(width: 80, height: 120)
+                                        .cornerRadius(6)
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 80, height: 120)
+                                        .cornerRadius(6)
+                                case .failure:
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.3))
+                                        .frame(width: 80, height: 120)
+                                        .cornerRadius(6)
+                                        .overlay(
+                                            Image(systemName: "photo")
+                                                .foregroundColor(.gray)
+                                        )
+                                @unknown default:
+                                    EmptyView()
+                                }
+                            }
+                        } else {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 80, height: 120)
+                                .cornerRadius(6)
+                                .overlay(
+                                    Image(systemName: "tv")
+                                        .foregroundColor(.gray)
+                                )
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+    }
+    
+    // Get formatted date of the most recently watched show
+    private var formattedLatestWatchDate: String {
+        guard let latestShow = watchedShows.sorted(by: { $0.dateWatched > $1.dateWatched }).first else {
+            return "Never"
+        }
+        
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: latestShow.dateWatched)
     }
 }
 
