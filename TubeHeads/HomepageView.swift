@@ -115,6 +115,7 @@ struct SideMenuView: View {
     @State private var navigateToProfile = false
     @State private var navigateToWatchlist = false
     @State private var navigateToLists = false
+    @State private var navigateToReviews = false
     var username: String
     
     var body: some View {
@@ -256,6 +257,11 @@ struct SideMenuView: View {
                         withAnimation {
                             showMenu = false
                         }
+                        
+                        // Navigate to reviews after menu closes
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            navigateToReviews = true
+                        }
                     } label: {
                         HStack {
                             Image(systemName: "star.fill")
@@ -360,6 +366,10 @@ struct SideMenuView: View {
                     }
                     
                     NavigationLink(destination: UserListsView().environmentObject(authManager), isActive: $navigateToLists) {
+                        EmptyView()
+                    }
+                    
+                    NavigationLink(destination: UserReviewsView().environmentObject(authManager), isActive: $navigateToReviews) {
                         EmptyView()
                     }
                     

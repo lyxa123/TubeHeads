@@ -114,6 +114,30 @@ class FirestoreReviewService {
         return reviews
     }
     
+    // Get all reviews by a specific user
+    func getReviewsByUser(userId: String) async throws -> [ShowReview] {
+        print("🔍 Fetching reviews for user ID: \(userId)")
+        
+        let snapshot = try await reviewsCollection
+            .whereField("userId", isEqualTo: userId)
+            .order(by: "timestamp", descending: true)
+            .getDocuments()
+        
+        print("🔍 Found \(snapshot.documents.count) reviews by user")
+        
+        let reviews = snapshot.documents.compactMap { document in
+            do {
+                let review = try document.data(as: ShowReview.self)
+                return review
+            } catch {
+                print("🔍 Error decoding review: \(error)")
+                return nil
+            }
+        }
+        
+        return reviews
+    }
+    
     // Delete a review
     func deleteReview(reviewId: String) async throws {
         // Get the review first to get the showId and userId
