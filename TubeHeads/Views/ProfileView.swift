@@ -1191,6 +1191,7 @@ struct FirestoreShowDetailViewWrapper: View {
     let showTitle: String
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var navigateToDetail = false
     
     var body: some View {
         ZStack {
@@ -1211,27 +1212,25 @@ struct FirestoreShowDetailViewWrapper: View {
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
+                    
+                    Button("Try Again") {
+                        Task {
+                            await checkShowExists()
+                        }
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
                 }
             } else {
-                // Navigate to FirestoreShowDetailView passing showId
-                // Since we can't directly instantiate FirestoreShow here,
-                // we'll use a different approach
-                NavigationLink(destination: FirestoreShowDetailViewNavigator(showId: showId)) {
-                    EmptyView()
-                }
-                .opacity(0)
-                .frame(width: 0, height: 0)
-                
-                // Show placeholder content while navigation happens
-                VStack {
-                    Text("Loading \(showTitle)...")
-                    ProgressView()
-                }
+                // Use a direct NavigationLink
+                FirestoreShowDetailViewNavigator(showId: showId)
             }
         }
         .navigationTitle(showTitle)
         .task {
-            // Simplify to just check if show exists
+            print("Checking if show exists: \(showId)")
             await checkShowExists()
         }
     }
@@ -1241,19 +1240,24 @@ struct FirestoreShowDetailViewWrapper: View {
         
         do {
             // Check if document exists in Firestore
+            print("Checking Firestore for show with ID: \(showId)")
             let document = try await Firestore.firestore().collection("shows").document(showId).getDocument()
             
             await MainActor.run {
                 if document.exists {
+                    print("Show exists, proceeding to detail view")
                     // Show exists, we can navigate
                     errorMessage = nil
+                    isLoading = false
                 } else {
+                    print("Show not found in Firestore")
                     // Show doesn't exist
                     errorMessage = "Show with ID \(showId) not found"
+                    isLoading = false
                 }
-                isLoading = false
             }
         } catch {
+            print("Error checking show: \(error.localizedDescription)")
             await MainActor.run {
                 errorMessage = "Error: \(error.localizedDescription)"
                 isLoading = false
@@ -1265,13 +1269,85 @@ struct FirestoreShowDetailViewWrapper: View {
 // Simple navigator view that can be used to pass just the ID to FirestoreShowDetailView
 struct FirestoreShowDetailViewNavigator: View {
     let showId: String
+    @State private var show: FirestoreShow?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
     
     var body: some View {
-        Text("Redirecting to show details...")
-            .onAppear {
-                // In a real implementation, you'd navigate directly to the show detail view
-                // For our simplified version, we're just showing a placeholder
+        ZStack {
+            if isLoading {
+                VStack(spacing: 12) {
+                    ProgressView("Loading show details...")
+                        .padding()
+                    Text("Show ID: \(showId)")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            } else if let error = errorMessage {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundColor(.orange)
+                    
+                    Text("Failed to load show details")
+                        .font(.headline)
+                    
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    Button("Try Again") {
+                        Task {
+                            await loadShow()
+                        }
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+            } else if let show = show {
+                FirestoreShowDetailView(firestoreShow: show)
+            } else {
+                Text("Show not found")
+                    .foregroundColor(.red)
             }
+        }
+        .task {
+            print("Navigator task triggered for show ID: \(showId)")
+            await loadShow()
+        }
+        .onAppear {
+            print("FirestoreShowDetailViewNavigator appeared for show ID: \(showId)")
+        }
+    }
+    
+    private func loadShow() async {
+        print("Starting to load show with ID: \(showId)")
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            print("Calling FirestoreShowService.getShow for ID: \(showId)")
+            let fetchedShow = try await FirestoreShowService.shared.getShow(id: showId)
+            print("Successfully fetched show: \(fetchedShow.name)")
+            
+            await MainActor.run {
+                self.show = fetchedShow
+                self.isLoading = false
+                print("Updated navigator UI with show data for: \(fetchedShow.name)")
+            }
+        } catch {
+            print("Error loading show: \(error.localizedDescription)")
+            print("Full error: \(error)")
+            
+            await MainActor.run {
+                self.errorMessage = error.localizedDescription
+                self.isLoading = false
+            }
+        }
     }
 }
 

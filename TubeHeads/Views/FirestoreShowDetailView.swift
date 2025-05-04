@@ -319,13 +319,16 @@ struct FirestoreShowDetailView: View {
     }
     
     private func loadShowDetails() async {
+        print("FirestoreShowDetailView: Start loading show details for show: \(firestoreShow.name) (TMDB ID: \(firestoreShow.tmdbId))")
         isLoading = true
         errorMessage = nil
         
         do {
             // If the show doesn't have an ID, check if it exists in Firestore or save it
             if firestoreShow.id == nil {
+                print("FirestoreShowDetailView: Show has no ID, trying to find or create in Firestore")
                 if let existingShow = try await FirestoreShowService.shared.getShowByTMDBId(tmdbId: firestoreShow.tmdbId) {
+                    print("FirestoreShowDetailView: Found existing show in Firestore with ID: \(existingShow.id ?? "unknown")")
                     // Update our local reference with the existing Firestore show
                     await MainActor.run {
                         // Create a new FirestoreShow with all properties from the existing one
@@ -338,8 +341,9 @@ struct FirestoreShowDetailView: View {
                             updatedShow.backdropPath = firestoreShow.backdropPath
                         }
                         firestoreShow = updatedShow
+                        print("FirestoreShowDetailView: Updated local reference with existing show data")
                     }
-                } else {
+                
                     // Save show to Firestore to get an ID
                     let showId = try await FirestoreShowService.shared.saveShow(from: TVShow(
                         id: firestoreShow.tmdbId,
@@ -349,51 +353,73 @@ struct FirestoreShowDetailView: View {
                         backdropPath: firestoreShow.backdropPath,
                         voteAverage: 0.0, firstAirDate: firestoreShow.firstAirDate  // Default value since FirestoreShow doesn't have this field
                     ))
+                    print("FirestoreShowDetailView: Saved show to Firestore with ID: \(showId)")
                     
                     // Get the full show with ID from Firestore
                     let savedShow = try await FirestoreShowService.shared.getShow(id: showId)
                     await MainActor.run {
                         firestoreShow = savedShow
+                        print("FirestoreShowDetailView: Updated show with saved data from Firestore")
                     }
                 }
+            } else {
+                print("FirestoreShowDetailView: Show already has ID: \(firestoreShow.id ?? "nil")")
             }
             
+            print("FirestoreShowDetailView: Refreshing show data")
             await refreshShowData()
         } catch {
             errorMessage = error.localizedDescription
-            print("Error loading show details: \(error)")
+            print("FirestoreShowDetailView ERROR: \(error.localizedDescription)")
+            print("FirestoreShowDetailView ERROR Full: \(error)")
         }
         
         isLoading = false
+        print("FirestoreShowDetailView: Finished loading show details")
     }
     
     private func refreshShowData() async {
+        print("FirestoreShowDetailView: Start refreshing show data")
         // Now that we have a valid Firestore show with ID, continue with other operations
         if let userId = authManager.currentUser?.uid {
+            print("FirestoreShowDetailView: Current user ID: \(userId)")
             // Check if show is in user's watchlist
             if let showId = firestoreShow.id {
+                print("FirestoreShowDetailView: Using show ID: \(showId)")
                 do {
                     // Load fresh show data to get updated ratings
+                    print("FirestoreShowDetailView: Fetching updated show data")
                     let updatedShow = try await FirestoreShowService.shared.getShow(id: showId)
                     
                     // Update the show data
                     await MainActor.run {
                         firestoreShow = updatedShow
+                        print("FirestoreShowDetailView: Updated show data with latest from Firestore")
                     }
                     
+                    print("FirestoreShowDetailView: Checking if show is in watchlist")
                     isInWatchlist = try await WatchlistService.shared.isInWatchlist(userId: userId, showId: showId)
+                    print("FirestoreShowDetailView: Show in watchlist: \(isInWatchlist)")
                     
                     // Check if show is in user's watched list
+                    print("FirestoreShowDetailView: Checking if show is in watched list")
                     let profile = try await ProfileManager.shared.getProfile(userId: userId)
                     isWatched = profile.watchedShows.contains(where: { $0.id == showId })
+                    print("FirestoreShowDetailView: Show watched: \(isWatched)")
                     
                     // Get user's rating if available
                     userRating = getUserRating(userId: userId)
+                    print("FirestoreShowDetailView: User rating: \(userRating ?? 0.0)")
                 } catch {
-                    print("Error refreshing show data: \(error)")
+                    print("FirestoreShowDetailView ERROR refreshing show data: \(error.localizedDescription)")
                 }
+            } else {
+                print("FirestoreShowDetailView: Show ID is nil, cannot refresh data")
             }
+        } else {
+            print("FirestoreShowDetailView: No user ID available, skipping user-specific data")
         }
+        print("FirestoreShowDetailView: Finished refreshing show data")
     }
     
     private func getUserRating(userId: String) -> Double? {
