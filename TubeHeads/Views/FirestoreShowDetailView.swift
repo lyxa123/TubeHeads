@@ -181,8 +181,9 @@ struct FirestoreShowDetailView: View {
                                 showRateSheet = true
                             }) {
                                 VStack {
-                                    Image(systemName: "star")
+                                    Image(systemName: userRating != nil ? "star.fill" : "star")
                                         .font(.system(size: 22))
+                                        .foregroundColor(userRating != nil ? .yellow : nil)
                                     Text("Rate")
                                         .font(.caption)
                                 }
