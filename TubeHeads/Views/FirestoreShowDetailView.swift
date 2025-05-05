@@ -78,17 +78,33 @@ struct FirestoreShowDetailView: View {
                         // Watchlist button
                         if authManager.isSignedIn {
                             Button(action: {
-                                toggleWatchlist()
+                                Task {
+                                    // If we don't have a show ID, save it first
+                                    if firestoreShow.id == nil {
+                                        await loadShowDetails()
+                                    }
+                                    
+                                    // Only toggle if we have a valid ID
+                                    if firestoreShow.id != nil {
+                                        toggleWatchlist()
+                                    }
+                                }
                             }) {
                                 VStack {
-                                    Image(systemName: isInWatchlist ? "bookmark.fill" : "bookmark")
-                                        .font(.system(size: 22))
+                                    if isAddingToWatchlist {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle())
+                                            .font(.system(size: 22))
+                                    } else {
+                                        Image(systemName: isInWatchlist ? "bookmark.fill" : "bookmark")
+                                            .font(.system(size: 22))
+                                    }
                                     Text("Watchlist")
                                         .font(.caption)
                                 }
                                 .frame(maxWidth: .infinity)
                             }
-                            .disabled(isAddingToWatchlist)
+                            .disabled(isAddingToWatchlist || isLoading)
                         } else {
                             Button(action: {
                                 // Sign in prompt
@@ -107,8 +123,13 @@ struct FirestoreShowDetailView: View {
                         // Watched button
                         if authManager.isSignedIn {
                             Button(action: {
-                                if let showId = firestoreShow.id, let userId = authManager.currentUser?.uid {
-                                    Task {
+                                Task {
+                                    // If we don't have a show ID, save it first
+                                    if firestoreShow.id == nil {
+                                        await loadShowDetails()
+                                    }
+                                    
+                                    if let showId = firestoreShow.id, let userId = authManager.currentUser?.uid {
                                         await toggleWatchedStatus(showId: showId, userId: userId)
                                     }
                                 }
@@ -128,7 +149,7 @@ struct FirestoreShowDetailView: View {
                                 }
                                 .frame(maxWidth: .infinity)
                             }
-                            .disabled(isMarkingWatched)
+                            .disabled(isMarkingWatched || isLoading)
                         } else {
                             Button(action: {
                                 // Sign in prompt
@@ -147,9 +168,17 @@ struct FirestoreShowDetailView: View {
                         // Add to list button
                         if authManager.isSignedIn {
                             Button(action: {
-                                showAddToListSheet = true
                                 Task {
-                                    await loadUserLists()
+                                    // If we don't have a show ID, save it first
+                                    if firestoreShow.id == nil {
+                                        await loadShowDetails()
+                                    }
+                                    
+                                    // Only proceed if we have a valid ID
+                                    if firestoreShow.id != nil {
+                                        showAddToListSheet = true
+                                        await loadUserLists()
+                                    }
                                 }
                             }) {
                                 VStack {
@@ -160,6 +189,7 @@ struct FirestoreShowDetailView: View {
                                 }
                                 .frame(maxWidth: .infinity)
                             }
+                            .disabled(isLoading)
                         } else {
                             Button(action: {
                                 // Sign in prompt
@@ -178,11 +208,21 @@ struct FirestoreShowDetailView: View {
                         // Rate button
                         if authManager.isSignedIn {
                             Button(action: {
-                                showRateSheet = true
+                                Task {
+                                    // If we don't have a show ID, save it first
+                                    if firestoreShow.id == nil {
+                                        await loadShowDetails()
+                                    }
+                                    
+                                    // Even if we still don't have an ID, we can continue
+                                    // as the RatingView will handle creating the show
+                                    showRateSheet = true
+                                }
                             }) {
                                 VStack {
-                                    Image(systemName: "star")
+                                    Image(systemName: userRating != nil ? "star.fill" : "star")
                                         .font(.system(size: 22))
+                                        .foregroundColor(userRating != nil ? .yellow : nil)
                                     Text("Rate")
                                         .font(.caption)
                                 }
@@ -196,6 +236,7 @@ struct FirestoreShowDetailView: View {
                                     }
                                 }
                             }
+                            .disabled(isLoading)
                         } else {
                             Button(action: {
                                 // Sign in prompt
@@ -275,17 +316,24 @@ struct FirestoreShowDetailView: View {
                         .padding(.vertical, 8)
                     
                     // Reviews section
-                    if let showId = firestoreShow.id {
-                        ReviewsView(
-                            showId: showId, 
-                            showName: firestoreShow.name,
-                            onReviewAdded: {
-                                Task {
-                                    await refreshShowData()
+                    VStack(alignment: .leading, spacing: 8) {
+                        if firestoreShow.id == nil {
+                            Text("Reviews will be available after accessing the full show details.")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                                .padding(.vertical)
+                        } else if let showId = firestoreShow.id {
+                            ReviewsView(
+                                showId: showId, 
+                                showName: firestoreShow.name,
+                                onReviewAdded: {
+                                    Task {
+                                        await refreshShowData()
+                                    }
                                 }
-                            }
-                        )
-                        .environmentObject(authManager)
+                            )
+                            .environmentObject(authManager)
+                        }
                     }
                 }
                 .padding(.horizontal)
@@ -318,13 +366,18 @@ struct FirestoreShowDetailView: View {
     }
     
     private func loadShowDetails() async {
+        print("FirestoreShowDetailView: Start loading show details for show: \(firestoreShow.name) (TMDB ID: \(firestoreShow.tmdbId))")
         isLoading = true
         errorMessage = nil
         
         do {
             // If the show doesn't have an ID, check if it exists in Firestore or save it
             if firestoreShow.id == nil {
+                print("FirestoreShowDetailView: Show has no ID, trying to find or create in Firestore")
+                var needsToSave = true
+                
                 if let existingShow = try await FirestoreShowService.shared.getShowByTMDBId(tmdbId: firestoreShow.tmdbId) {
+                    print("FirestoreShowDetailView: Found existing show in Firestore with ID: \(existingShow.id ?? "unknown")")
                     // Update our local reference with the existing Firestore show
                     await MainActor.run {
                         // Create a new FirestoreShow with all properties from the existing one
@@ -337,62 +390,91 @@ struct FirestoreShowDetailView: View {
                             updatedShow.backdropPath = firestoreShow.backdropPath
                         }
                         firestoreShow = updatedShow
+                        print("FirestoreShowDetailView: Updated local reference with existing show data")
                     }
-                } else {
-                    // Save show to Firestore to get an ID
+                    
+                    // Only save if we don't have a valid ID yet
+                    needsToSave = existingShow.id == nil
+                }
+                
+                // Save show to Firestore to get an ID if needed
+                if needsToSave {
+                    print("FirestoreShowDetailView: Saving show to Firestore")
                     let showId = try await FirestoreShowService.shared.saveShow(from: TVShow(
                         id: firestoreShow.tmdbId,
                         name: firestoreShow.name,
                         overview: firestoreShow.overview,
                         posterPath: firestoreShow.posterPath,
                         backdropPath: firestoreShow.backdropPath,
-                        voteAverage: 0.0, firstAirDate: firestoreShow.firstAirDate  // Default value since FirestoreShow doesn't have this field
+                        voteAverage: 0.0, firstAirDate: firestoreShow.firstAirDate
                     ))
+                    print("FirestoreShowDetailView: Saved show to Firestore with ID: \(showId)")
                     
                     // Get the full show with ID from Firestore
                     let savedShow = try await FirestoreShowService.shared.getShow(id: showId)
                     await MainActor.run {
                         firestoreShow = savedShow
+                        print("FirestoreShowDetailView: Updated show with saved data from Firestore")
                     }
                 }
+            } else {
+                print("FirestoreShowDetailView: Show already has ID: \(firestoreShow.id ?? "nil")")
             }
             
+            print("FirestoreShowDetailView: Refreshing show data")
             await refreshShowData()
         } catch {
             errorMessage = error.localizedDescription
-            print("Error loading show details: \(error)")
+            print("FirestoreShowDetailView ERROR: \(error.localizedDescription)")
+            print("FirestoreShowDetailView ERROR Full: \(error)")
         }
         
         isLoading = false
+        print("FirestoreShowDetailView: Finished loading show details")
     }
     
     private func refreshShowData() async {
+        print("FirestoreShowDetailView: Start refreshing show data")
         // Now that we have a valid Firestore show with ID, continue with other operations
         if let userId = authManager.currentUser?.uid {
+            print("FirestoreShowDetailView: Current user ID: \(userId)")
             // Check if show is in user's watchlist
             if let showId = firestoreShow.id {
+                print("FirestoreShowDetailView: Using show ID: \(showId)")
                 do {
                     // Load fresh show data to get updated ratings
+                    print("FirestoreShowDetailView: Fetching updated show data")
                     let updatedShow = try await FirestoreShowService.shared.getShow(id: showId)
                     
                     // Update the show data
                     await MainActor.run {
                         firestoreShow = updatedShow
+                        print("FirestoreShowDetailView: Updated show data with latest from Firestore")
                     }
                     
+                    print("FirestoreShowDetailView: Checking if show is in watchlist")
                     isInWatchlist = try await WatchlistService.shared.isInWatchlist(userId: userId, showId: showId)
+                    print("FirestoreShowDetailView: Show in watchlist: \(isInWatchlist)")
                     
                     // Check if show is in user's watched list
+                    print("FirestoreShowDetailView: Checking if show is in watched list")
                     let profile = try await ProfileManager.shared.getProfile(userId: userId)
                     isWatched = profile.watchedShows.contains(where: { $0.id == showId })
+                    print("FirestoreShowDetailView: Show watched: \(isWatched)")
                     
                     // Get user's rating if available
                     userRating = getUserRating(userId: userId)
+                    print("FirestoreShowDetailView: User rating: \(userRating ?? 0.0)")
                 } catch {
-                    print("Error refreshing show data: \(error)")
+                    print("FirestoreShowDetailView ERROR refreshing show data: \(error.localizedDescription)")
                 }
+            } else {
+                print("FirestoreShowDetailView: Show ID is nil, cannot refresh data")
             }
+        } else {
+            print("FirestoreShowDetailView: No user ID available, skipping user-specific data")
         }
+        print("FirestoreShowDetailView: Finished refreshing show data")
     }
     
     private func getUserRating(userId: String) -> Double? {
@@ -416,8 +498,13 @@ struct FirestoreShowDetailView: View {
     }
     
     private func toggleWatchlist() {
-        guard let showId = firestoreShow.id,
-              let userId = authManager.currentUser?.uid else {
+        guard let userId = authManager.currentUser?.uid else {
+            return
+        }
+        
+        // Ensure we have a show ID
+        guard let showId = firestoreShow.id else {
+            print("Cannot toggle watchlist: Show ID is nil")
             return
         }
         
@@ -427,16 +514,22 @@ struct FirestoreShowDetailView: View {
             do {
                 if isInWatchlist {
                     try await WatchlistService.shared.removeFromWatchlist(userId: userId, showId: showId)
-                    isInWatchlist = false
+                    await MainActor.run {
+                        isInWatchlist = false
+                    }
                 } else {
                     try await WatchlistService.shared.addToWatchlist(userId: userId, showId: showId)
-                    isInWatchlist = true
+                    await MainActor.run {
+                        isInWatchlist = true
+                    }
                 }
             } catch {
                 print("Error toggling watchlist: \(error)")
             }
             
-            isAddingToWatchlist = false
+            await MainActor.run {
+                isAddingToWatchlist = false
+            }
         }
     }
     
@@ -869,6 +962,7 @@ struct RatingView: View {
     @State private var isSubmitting = false
     @State private var successMessage: String?
     @State private var errorMessage: String?
+    @State private var isCreatingShow = false
     
     init(show: FirestoreShow, userCurrentRating: Double? = nil, onRatingSubmitted: @escaping (Double) -> Void = { _ in }) {
         self.show = show
@@ -931,7 +1025,7 @@ struct RatingView: View {
                 }
                 
                 Button(action: submitRating) {
-                    if isSubmitting {
+                    if isSubmitting || isCreatingShow {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle())
                     } else {
@@ -944,7 +1038,7 @@ struct RatingView: View {
                             .cornerRadius(10)
                     }
                 }
-                .disabled(isSubmitting || rating == 0) // Disable if no rating selected
+                .disabled(isSubmitting || isCreatingShow || rating == 0) // Disable if no rating selected or processing
                 .padding(.horizontal)
                 
                 Spacer()
@@ -957,8 +1051,8 @@ struct RatingView: View {
     }
     
     private func submitRating() {
-        guard let userId = authManager.currentUser?.uid, let showId = show.id else {
-            errorMessage = "Unable to submit rating. Please try again."
+        guard let userId = authManager.currentUser?.uid else {
+            errorMessage = "You need to be signed in to submit a rating."
             return
         }
         
@@ -967,11 +1061,36 @@ struct RatingView: View {
         
         Task {
             do {
-                try await FirestoreShowService.shared.rateShow(
-                    showId: showId,
-                    userId: userId,
-                    rating: rating
-                )
+                // If show doesn't have an ID, try to save it first
+                if show.id == nil {
+                    isCreatingShow = true
+                    // Make sure we save the show to Firestore first
+                    let showId = try await FirestoreShowService.shared.saveShow(from: TVShow(
+                        id: show.tmdbId,
+                        name: show.name,
+                        overview: show.overview,
+                        posterPath: show.posterPath,
+                        backdropPath: show.backdropPath,
+                        voteAverage: 0.0, 
+                        firstAirDate: show.firstAirDate
+                    ))
+                    
+                    isCreatingShow = false
+                    
+                    // Now that the show is saved, rate it
+                    try await FirestoreShowService.shared.rateShow(
+                        showId: showId,
+                        userId: userId,
+                        rating: rating
+                    )
+                } else {
+                    // The show already exists, just rate it
+                    try await FirestoreShowService.shared.rateShow(
+                        showId: show.id!,
+                        userId: userId,
+                        rating: rating
+                    )
+                }
                 
                 await MainActor.run {
                     successMessage = "Rating submitted successfully!"
@@ -987,6 +1106,7 @@ struct RatingView: View {
                 await MainActor.run {
                     errorMessage = "Failed to submit rating: \(error.localizedDescription)"
                     isSubmitting = false
+                    isCreatingShow = false
                 }
             }
         }

@@ -521,12 +521,12 @@ struct ProfileView: View {
                         
                         Spacer()
                         
-                        Button(action: {
-                            // View all watched shows
-                        }) {
-                            Text("See All")
-                                .font(.subheadline)
-                                .foregroundColor(.blue)
+                        if watchedShows.count > 3 {
+                            NavigationLink(destination: WatchedShowsView(shows: watchedShows)) {
+                                Text("See All")
+                                    .font(.subheadline)
+                                    .foregroundColor(.blue)
+                            }
                         }
                     }
                     .padding(.horizontal)
@@ -540,7 +540,7 @@ struct ProfileView: View {
                             .padding()
                     } else {
                         // Only show up to 3 items in the preview
-                        let previewShows = Array(watchedShows.prefix(3))
+                        let previewShows = Array(watchedShows.sorted(by: { $0.dateWatched > $1.dateWatched }).prefix(3))
                         
                         VStack(spacing: 10) {
                             ForEach(previewShows) { show in
@@ -608,6 +608,10 @@ struct ProfileView: View {
                     }
                 }
                 .padding(.vertical, 8)
+                
+                Divider()
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
                 
                 Spacer()
             }
@@ -1191,6 +1195,7 @@ struct FirestoreShowDetailViewWrapper: View {
     let showTitle: String
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var navigateToDetail = false
     
     var body: some View {
         ZStack {
@@ -1211,27 +1216,25 @@ struct FirestoreShowDetailViewWrapper: View {
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
+                    
+                    Button("Try Again") {
+                        Task {
+                            await checkShowExists()
+                        }
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
                 }
             } else {
-                // Navigate to FirestoreShowDetailView passing showId
-                // Since we can't directly instantiate FirestoreShow here,
-                // we'll use a different approach
-                NavigationLink(destination: FirestoreShowDetailViewNavigator(showId: showId)) {
-                    EmptyView()
-                }
-                .opacity(0)
-                .frame(width: 0, height: 0)
-                
-                // Show placeholder content while navigation happens
-                VStack {
-                    Text("Loading \(showTitle)...")
-                    ProgressView()
-                }
+                // Use a direct NavigationLink
+                FirestoreShowDetailViewNavigator(showId: showId)
             }
         }
         .navigationTitle(showTitle)
         .task {
-            // Simplify to just check if show exists
+            print("Checking if show exists: \(showId)")
             await checkShowExists()
         }
     }
@@ -1241,19 +1244,24 @@ struct FirestoreShowDetailViewWrapper: View {
         
         do {
             // Check if document exists in Firestore
+            print("Checking Firestore for show with ID: \(showId)")
             let document = try await Firestore.firestore().collection("shows").document(showId).getDocument()
             
             await MainActor.run {
                 if document.exists {
+                    print("Show exists, proceeding to detail view")
                     // Show exists, we can navigate
                     errorMessage = nil
+                    isLoading = false
                 } else {
+                    print("Show not found in Firestore")
                     // Show doesn't exist
                     errorMessage = "Show with ID \(showId) not found"
+                    isLoading = false
                 }
-                isLoading = false
             }
         } catch {
+            print("Error checking show: \(error.localizedDescription)")
             await MainActor.run {
                 errorMessage = "Error: \(error.localizedDescription)"
                 isLoading = false
@@ -1265,13 +1273,85 @@ struct FirestoreShowDetailViewWrapper: View {
 // Simple navigator view that can be used to pass just the ID to FirestoreShowDetailView
 struct FirestoreShowDetailViewNavigator: View {
     let showId: String
+    @State private var show: FirestoreShow?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
     
     var body: some View {
-        Text("Redirecting to show details...")
-            .onAppear {
-                // In a real implementation, you'd navigate directly to the show detail view
-                // For our simplified version, we're just showing a placeholder
+        ZStack {
+            if isLoading {
+                VStack(spacing: 12) {
+                    ProgressView("Loading show details...")
+                        .padding()
+                    Text("Show ID: \(showId)")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            } else if let error = errorMessage {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundColor(.orange)
+                    
+                    Text("Failed to load show details")
+                        .font(.headline)
+                    
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    Button("Try Again") {
+                        Task {
+                            await loadShow()
+                        }
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+            } else if let show = show {
+                FirestoreShowDetailView(firestoreShow: show)
+            } else {
+                Text("Show not found")
+                    .foregroundColor(.red)
             }
+        }
+        .task {
+            print("Navigator task triggered for show ID: \(showId)")
+            await loadShow()
+        }
+        .onAppear {
+            print("FirestoreShowDetailViewNavigator appeared for show ID: \(showId)")
+        }
+    }
+    
+    private func loadShow() async {
+        print("Starting to load show with ID: \(showId)")
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            print("Calling FirestoreShowService.getShow for ID: \(showId)")
+            let fetchedShow = try await FirestoreShowService.shared.getShow(id: showId)
+            print("Successfully fetched show: \(fetchedShow.name)")
+            
+            await MainActor.run {
+                self.show = fetchedShow
+                self.isLoading = false
+                print("Updated navigator UI with show data for: \(fetchedShow.name)")
+            }
+        } catch {
+            print("Error loading show: \(error.localizedDescription)")
+            print("Full error: \(error)")
+            
+            await MainActor.run {
+                self.errorMessage = error.localizedDescription
+                self.isLoading = false
+            }
+        }
     }
 }
 
@@ -1592,8 +1672,264 @@ struct PublicListRow: View {
     }
 }
 
+// View to show all watched shows
+struct WatchedShowsView: View {
+    let shows: [WatchedShow]
+    @State private var sortOption: SortOption = .dateNewest
+    
+    enum SortOption {
+        case dateNewest
+        case dateOldest
+        case titleAZ
+        case ratingHighest
+    }
+    
+    var sortedShows: [WatchedShow] {
+        switch sortOption {
+        case .dateNewest:
+            return shows.sorted(by: { $0.dateWatched > $1.dateWatched })
+        case .dateOldest:
+            return shows.sorted(by: { $0.dateWatched < $1.dateWatched })
+        case .titleAZ:
+            return shows.sorted(by: { $0.title < $1.title })
+        case .ratingHighest:
+            return shows.sorted { 
+                let rating1 = $0.rating ?? 0
+                let rating2 = $1.rating ?? 0
+                return rating1 > rating2
+            }
+        }
+    }
+    
+    var body: some View {
+        VStack {
+            if shows.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "tv")
+                        .font(.system(size: 60))
+                        .foregroundColor(.gray.opacity(0.6))
+                        .padding(.top, 60)
+                    
+                    Text("No watched shows yet")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    Text("Shows you mark as watched will appear here")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .padding()
+            } else {
+                // Sort picker
+                Picker("Sort by", selection: $sortOption) {
+                    Text("Newest First").tag(SortOption.dateNewest)
+                    Text("Oldest First").tag(SortOption.dateOldest)
+                    Text("Title A-Z").tag(SortOption.titleAZ)
+                    Text("Highest Rated").tag(SortOption.ratingHighest)
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(sortedShows) { show in
+                            WatchedShowRow(show: show)
+                                .padding(.horizontal)
+                        }
+                    }
+                    .padding(.vertical)
+                }
+            }
+        }
+        .navigationTitle("Watched Shows")
+    }
+}
+
 struct ProfileView_Previews: PreviewProvider {
     static var previews: some View {
         ProfileView()
+    }
+}
+
+// View to show user's liked lists
+struct LikedListsView: View {
+    @State private var likedLists: [ShowList] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String? = nil
+    @EnvironmentObject private var authManager: AuthManager
+    
+    var body: some View {
+        VStack {
+            if isLoading {
+                ProgressView()
+                    .scaleEffect(1.5)
+                    .padding()
+            } else if let error = errorMessage {
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundColor(.orange)
+                        .padding()
+                    
+                    Text("Error Loading Lists")
+                        .font(.headline)
+                    
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    Button("Try Again") {
+                        loadLikedLists()
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+                .padding()
+            } else if likedLists.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "heart")
+                        .font(.system(size: 60))
+                        .foregroundColor(.gray.opacity(0.6))
+                        .padding(.top, 60)
+                    
+                    Text("No liked lists yet")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    Text("Lists you like from other users will appear here")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .padding()
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(likedLists) { list in
+                            NavigationLink(destination: UserListView(listId: list.id ?? "", listName: list.name)) {
+                                LikedListRow(list: list)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(.vertical)
+                }
+            }
+        }
+        .navigationTitle("Liked Lists")
+        .task {
+            loadLikedLists()
+        }
+    }
+    
+    private func loadLikedLists() {
+        guard let userId = authManager.currentUser?.uid else { return }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                let lists = try await ListService.shared.getLikedLists(userId: userId)
+                
+                await MainActor.run {
+                    self.likedLists = lists
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                    self.isLoading = false
+                }
+            }
+        }
+    }
+}
+
+struct LikedListRow: View {
+    let list: ShowList
+    @State private var creatorUsername: String = ""
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // List icon with heart
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.red.opacity(0.1))
+                    .frame(width: 45, height: 45)
+                
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.red)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                // List name
+                Text(list.name)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                    .foregroundColor(.primary)
+                
+                // List description
+                if !list.description.isEmpty {
+                    Text(list.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                
+                // Show count and creator
+                HStack {
+                    Text("\(list.showIds.count) shows")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                    
+                    Text("•")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    
+                    Text("Created by \(creatorUsername.isEmpty ? "User" : creatorUsername)")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(.gray)
+                .padding(.trailing, 4)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
+        .padding(.horizontal)
+        .onAppear {
+            loadCreatorUsername()
+        }
+    }
+    
+    private func loadCreatorUsername() {
+        Task {
+            do {
+                let profile = try await ProfileManager.shared.getProfile(userId: list.userId)
+                await MainActor.run {
+                    creatorUsername = profile.username
+                }
+            } catch {
+                print("Error loading creator username: \(error)")
+            }
+        }
     }
 } 
