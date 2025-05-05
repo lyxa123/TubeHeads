@@ -23,6 +23,7 @@ class ListService {
     
     private let userCollection = Firestore.firestore().collection("users")
     private let listCollection = Firestore.firestore().collection("lists")
+    private let likedListsCollection = Firestore.firestore().collection("likedLists")
     
     private init() {}
     
@@ -115,5 +116,72 @@ class ListService {
         }
         
         return shows
+    }
+    
+    // MARK: - List Likes Functionality
+    
+    // Like a list
+    func likeList(listId: String, userId: String) async throws {
+        let likedListsRef = likedListsCollection.document(userId)
+        
+        // Check if document exists
+        let docSnapshot = try await likedListsRef.getDocument()
+        
+        if docSnapshot.exists {
+            // Update existing document
+            try await likedListsRef.updateData([
+                "lists": FieldValue.arrayUnion([listId])
+            ])
+        } else {
+            // Create new document
+            try await likedListsRef.setData([
+                "userId": userId,
+                "lists": [listId]
+            ])
+        }
+    }
+    
+    // Unlike a list
+    func unlikeList(listId: String, userId: String) async throws {
+        let likedListsRef = likedListsCollection.document(userId)
+        
+        try await likedListsRef.updateData([
+            "lists": FieldValue.arrayRemove([listId])
+        ])
+    }
+    
+    // Check if user has liked a list
+    func isListLiked(listId: String, userId: String) async throws -> Bool {
+        let likedListsRef = likedListsCollection.document(userId)
+        let document = try await likedListsRef.getDocument()
+        
+        if document.exists, let data = document.data(), let lists = data["lists"] as? [String] {
+            return lists.contains(listId)
+        }
+        
+        return false
+    }
+    
+    // Get all liked lists for a user
+    func getLikedLists(userId: String) async throws -> [ShowList] {
+        let likedListsRef = likedListsCollection.document(userId)
+        let document = try await likedListsRef.getDocument()
+        
+        if document.exists, let data = document.data(), let listIds = data["lists"] as? [String] {
+            var likedLists: [ShowList] = []
+            
+            for listId in listIds {
+                do {
+                    let list = try await getList(id: listId)
+                    likedLists.append(list)
+                } catch {
+                    print("Error getting list \(listId): \(error)")
+                }
+            }
+            
+            return likedLists
+        }
+        
+        return []
     }
 } 

@@ -28,8 +28,21 @@ struct ReviewsView: View {
                     Button(action: {
                         showAddReviewSheet = true
                     }) {
-                        Label("Write a Review", systemImage: "square.and.pencil")
-                            .font(.subheadline)
+                        if userReview != nil {
+                            Label("Edit Review", systemImage: "pencil")
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                        } else {
+                            HStack {
+                                Label("Write a Review", systemImage: "square.and.pencil")
+                                    .font(.subheadline)
+                                if userExistingRating != nil {
+                                    Image(systemName: "star.fill")
+                                        .foregroundColor(.yellow)
+                                        .font(.caption)
+                                }
+                            }
+                        }
                     }
                     .disabled(userReview != nil)
                 }
@@ -433,7 +446,7 @@ struct AddReviewView: View {
                 .foregroundColor(.white)
                 .cornerRadius(8)
                 .padding(.top)
-                .disabled(isSubmitting || reviewText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || rating == 0)
+                .disabled(isSubmitting || reviewText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (rating == 0 && userExistingRating == nil))
             }
             .navigationTitle("Write a Review")
             .navigationBarTitleDisplayMode(.inline)
