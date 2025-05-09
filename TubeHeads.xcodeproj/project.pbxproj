@@ -441,6 +441,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "We use Face ID to securely log you into your TubeHeads account";
 				INFOPLIST_KEY_NSLocationUsageDescription = "Your location is used only for your profile information.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "TubeHeads needs your location to display it on your profile, helping you connect with TV fans in your area.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -454,7 +455,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = TH.TubeHeads;
+				PRODUCT_BUNDLE_IDENTIFIER = TH2025.TubeHeads;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -474,6 +475,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "We use Face ID to securely log you into your TubeHeads account";
 				INFOPLIST_KEY_NSLocationUsageDescription = "Your location is used only for your profile information.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "TubeHeads needs your location to display it on your profile, helping you connect with TV fans in your area.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -487,7 +489,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = TH.TubeHeads;
+				PRODUCT_BUNDLE_IDENTIFIER = TH2025.TubeHeads;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

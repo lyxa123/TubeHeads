@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseAuth
+import LocalAuthentication
 
 struct SignInView: View {
     @StateObject private var viewModel = SignInViewModel()
@@ -7,6 +8,7 @@ struct SignInView: View {
     @Binding var showSignInView: Bool
     @State private var isLoading = false
     @State private var firebaseError: String? = nil
+    @State private var showingBiometricPrompt = false
     
     var body: some View {
         VStack(spacing: 20) {
@@ -27,6 +29,16 @@ struct SignInView: View {
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(10)
             
+            // Remember me checkbox
+            HStack {
+                Toggle("Remember me", isOn: $viewModel.shouldRememberCredentials)
+                    .font(.caption)
+                    .toggleStyle(CheckboxToggleStyle())
+                
+                Spacer()
+            }
+            .padding(.vertical, 5)
+            
             if viewModel.showError {
                 Text(viewModel.errorMessage)
                     .foregroundColor(.red)
@@ -46,6 +58,7 @@ struct SignInView: View {
                     }
             }
             
+            // Email/Password Sign In Button
             Button {
                 Task {
                     isLoading = true
@@ -99,6 +112,48 @@ struct SignInView: View {
             }
             .disabled(isLoading)
             
+            // Use biometrics button similar to Bank of America app
+            if viewModel.isBiometricAvailable {
+                Button {
+                    Task {
+                        await performBiometricAuthentication()
+                    }
+                } label: {
+                    Text("Use biometrics")
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                        .padding(.top, 10)
+                }
+                .disabled(isLoading)
+                
+                // Biometric type indicator
+                HStack {
+                    if viewModel.biometricManager.biometricType == .faceID {
+                        Image(systemName: "faceid")
+                            .foregroundColor(.gray)
+                    } else {
+                        Image(systemName: "touchid")
+                            .foregroundColor(.gray)
+                    }
+                    
+                    Text("Biometric login available")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    
+                    Spacer()
+                    
+                    // Remove saved credentials button
+                    Button {
+                        viewModel.removeBiometricCredentials()
+                    } label: {
+                        Text("Remove")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                }
+                .padding(.top, 5)
+            }
+            
             NavigationLink {
                 SignUpView(showSignInView: $showSignInView)
             } label: {
@@ -112,5 +167,47 @@ struct SignInView: View {
         .padding()
         .navigationTitle("Sign In")
         .disabled(isLoading)
+        .onAppear {
+            // Check if biometric auth is available when view appears
+            viewModel.checkBiometricAvailability()
+            
+            // If biometric auth is available, show the prompt automatically
+            if viewModel.isBiometricAvailable && !showingBiometricPrompt {
+                showingBiometricPrompt = true
+                Task {
+                    // Wait a short moment to ensure view is fully loaded
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    await performBiometricAuthentication()
+                }
+            }
+        }
+    }
+    
+    // Function to handle biometric authentication
+    func performBiometricAuthentication() async {
+        isLoading = true
+        await viewModel.signInWithBiometric(authManager: authManager)
+        isLoading = false
+        
+        if !viewModel.showError && Auth.auth().currentUser != nil {
+            showSignInView = false
+        }
+    }
+}
+
+struct CheckboxToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack {
+            Image(systemName: configuration.isOn ? "checkmark.square" : "square")
+                .resizable()
+                .frame(width: 20, height: 20)
+                .foregroundColor(configuration.isOn ? .blue : .gray)
+                .font(.system(size: 20, weight: .regular))
+                .onTapGesture {
+                    configuration.isOn.toggle()
+                }
+            
+            configuration.label
+        }
     }
 } 
