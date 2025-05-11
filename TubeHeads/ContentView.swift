@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 enum Tab {
-    case home, search, watchlist, lists, trending, reviews, profile
+    case home, search, watchlist, lists, trending, reviews, profile, activities
 }
 
 struct ContentView: View {
@@ -65,6 +65,14 @@ struct ContentView: View {
                 Label("Reviews", systemImage: "star.bubble")
             }
             .tag(Tab.reviews)
+            
+            NavigationView {
+                ActivitiesView()
+            }
+            .tabItem {
+                Label("Activities", systemImage: "flame")
+            }
+            .tag(Tab.activities)
             
             NavigationView {
                 ProfileView()

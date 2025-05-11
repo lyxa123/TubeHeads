@@ -26,7 +26,12 @@ struct ReviewsView: View {
                 
                 if authManager.isSignedIn {
                     Button(action: {
-                        showAddReviewSheet = true
+                        if userReview != nil {
+                            userReview = userReview
+                            showEditReviewSheet = true
+                        } else {
+                            showAddReviewSheet = true
+                        }
                     }) {
                         if userReview != nil {
                             Label("Edit Review", systemImage: "pencil")
@@ -44,7 +49,6 @@ struct ReviewsView: View {
                             }
                         }
                     }
-                    .disabled(userReview != nil)
                 }
             }
             
@@ -354,7 +358,7 @@ struct ReviewCard: View {
         }
         .sheet(isPresented: $showUserProfile) {
             NavigationView {
-                UserProfileView(userId: review.userId)
+                UserProfileView(userId: review.userId, showBackButton: true)
                     .environmentObject(authManager)
             }
         }
