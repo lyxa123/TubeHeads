@@ -6,6 +6,7 @@
 import SwiftUI
 import SwiftData
 import FirebaseCore
+import FirebaseFirestore //  Added for Firestore offline support
 
 @main
 struct TubeHeadsApp: App {
@@ -27,8 +28,7 @@ struct TubeHeadsApp: App {
         }
     }()
 
-    
-// first view on the app
+    // first view on the app
     var body: some Scene {
         WindowGroup {
             RootView()
@@ -40,13 +40,21 @@ struct TubeHeadsApp: App {
 }
 
 class AppDelegate: NSObject, UIApplicationDelegate {
-  func application(_ application: UIApplication,didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-      FirebaseApp.configure()
-      print("Firebase Configured!")
-      
-      // Initialize the LocationManager
-      _ = LocationManager.shared
-      
-      return true
-  }
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil
+    ) -> Bool {
+        FirebaseApp.configure()
+        print("Firebase Configured!")
+        
+        // ✅ Enable Firestore offline persistence
+        let settings = FirestoreSettings()
+        settings.isPersistenceEnabled = true
+        Firestore.firestore().settings = settings
+        
+        // Initialize the LocationManager
+        _ = LocationManager.shared
+        
+        return true
+    }
 }
