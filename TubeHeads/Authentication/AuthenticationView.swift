@@ -1,4 +1,5 @@
 import SwiftUI
+import LocalAuthentication
 
 struct AuthenticationView: View {
     @EnvironmentObject private var authManager: AuthManager
