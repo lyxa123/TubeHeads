@@ -1,12 +1,24 @@
 import SwiftUI
 import FirebaseFirestore
 
+// First add a model to track user stats
+struct UserProfileData {
+    var username: String = "User"
+    var bio: String = "No bio yet"
+    var location: String = ""
+    var followerCount: Int = 0
+    var followingCount: Int = 0
+    var reviewsCount: Int = 0
+    var listsCount: Int = 0
+}
+
 struct UserProfileView: View {
     let userId: String
+    // Add parameter to control whether to show the back button
+    var showBackButton: Bool = false
     
-    @State private var username: String = "User"
-    @State private var bio: String = "No bio yet"
-    @State private var location: String = ""
+    // Initialize directly with default values
+    @State private var user = UserProfileData()
     @State private var profileImage: UIImage? = nil
     @State private var isLoading: Bool = false
     @State private var isImageLoading: Bool = false
@@ -23,18 +35,19 @@ struct UserProfileView: View {
             VStack(alignment: .leading, spacing: 12) {
                 // Header with back button and title
                 HStack {
-                    Button(action: {
-                        presentationMode.wrappedValue.dismiss()
-                    }) {
-                        Image(systemName: "arrow.left")
-                            .font(.title3)
-                            .foregroundColor(.primary)
+                    if showBackButton {
+                        Button(action: {
+                            presentationMode.wrappedValue.dismiss()
+                        }) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "chevron.left")
+                                    .font(.title3)
+                                Text("Back")
+                                    .fontWeight(.regular)
+                            }
+                            .foregroundColor(.blue)
+                        }
                     }
-                    
-                    Text(isLoading ? "User's Profile" : "\(username)'s Profile")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .lineLimit(1)
                     
                     Spacer()
                 }
@@ -43,7 +56,7 @@ struct UserProfileView: View {
                 
                 // Username with lock icon if profile is private
                 HStack {
-                    Text(username)
+                    Text(user.username)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     
@@ -57,7 +70,7 @@ struct UserProfileView: View {
                     
                     // Only show follow button if viewing someone else's profile
                     if let currentUserId = authManager.currentUser?.uid, currentUserId != userId {
-                        FollowButton(userId: userId)
+                        FollowButton(userId: userId, followerCount: $user.followerCount)
                     }
                 }
                 .padding(.horizontal)
@@ -98,19 +111,69 @@ struct UserProfileView: View {
                             UserProfileImageView(size: 100)
                         }
                         
-                        Text(bio)
+                        Text(user.bio)
                             .font(.headline)
                         
-                        if !location.isEmpty {
+                        if !user.location.isEmpty {
                             HStack {
                                 Image(systemName: "mappin.and.ellipse")
                                     .font(.caption)
                                     .foregroundColor(.red)
-                                Text(location)
+                                Text(user.location)
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
                         }
+                        
+                        // User stats section - moved here and centered
+                        HStack(spacing: 0) {
+                            Spacer()
+                            
+                            NavigationLink(destination: FollowersView(userId: userId)) {
+                                VStack(alignment: .center) {
+                                    Text("\(user.followerCount)")
+                                        .font(.headline)
+                                    Text("Followers")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                .frame(minWidth: 70)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            NavigationLink(destination: FollowingView(userId: userId)) {
+                                VStack(alignment: .center) {
+                                    Text("\(user.followingCount)")
+                                        .font(.headline)
+                                    Text("Following")
+                                        .font(.caption)
+                                    .foregroundColor(.gray)
+                                }
+                                .frame(minWidth: 70)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            VStack(alignment: .center) {
+                                Text("\(watchedShows.count)")
+                                    .font(.headline)
+                                Text("Watched")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(minWidth: 70)
+                            
+                            VStack(alignment: .center) {
+                                Text("\(user.listsCount)")
+                                    .font(.headline)
+                                Text("Lists")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(minWidth: 70)
+                            
+                            Spacer()
+                        }
+                        .padding(.vertical, 16)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical)
@@ -234,11 +297,27 @@ struct UserProfileView: View {
                     }
                 }
                 
+                // Get follower and following counts
+                var followerCount = 0
+                var followingCount = 0
+                
+                do {
+                    followerCount = try await FollowService.shared.getFollowerCount(userId: userId)
+                    followingCount = try await FollowService.shared.getFollowingCount(userId: userId)
+                } catch {
+                    print("Error fetching follow counts: \(error)")
+                }
+                
                 // Update UI with profile data
                 await MainActor.run {
-                    self.username = profile.username
-                    self.bio = profile.bio
-                    self.location = profile.location
+                    self.user.username = profile.username
+                    self.user.bio = profile.bio
+                    self.user.location = profile.location
+                    self.user.followerCount = followerCount
+                    self.user.followingCount = followingCount
+                    self.user.reviewsCount = profile.watchedShows.count
+                    self.user.listsCount = 0
+                    
                     self.isPublic = profile.isPublic
                     self.watchedShows = profile.isPublic ? profile.watchedShows : []
                     self.isLoading = false
@@ -278,6 +357,9 @@ struct UserProfileView: View {
                                 showIds: list.showIds)
                     }
                     self.isLoadingLists = false
+                    
+                    // Update the lists count
+                    self.user.listsCount = publicLists.count
                 }
             } catch {
                 print("Failed to load user lists: \(error.localizedDescription)")
@@ -521,6 +603,13 @@ struct FollowButton: View {
     @State private var isFollowing = false
     @State private var isLoading = false
     @EnvironmentObject private var authManager: AuthManager
+    @Binding var followerCount: Int
+    
+    // Initialize with a default binding for follower count if not provided
+    init(userId: String, followerCount: Binding<Int>? = nil) {
+        self.userId = userId
+        self._followerCount = followerCount ?? .constant(0)
+    }
     
     var body: some View {
         Button(action: {
@@ -556,24 +645,15 @@ struct FollowButton: View {
         
         isLoading = true
         
-        // Here you would check if the current user is following this user
-        // For demonstration, we'll simulate an API call
         Task {
             do {
-                // Simulated check - in a real app, you'd query Firestore
-                // to check if currentUserId follows userId
-                try await Task.sleep(nanoseconds: 500_000_000) // 0.5 sec delay
-                
-                // This would be a Firestore query in a real implementation
-                let followsDoc = try? await Firestore.firestore()
-                    .collection("follows")
-                    .document(currentUserId)
-                    .getDocument()
-                
-                let isFollowing = followsDoc?.data()?["following"] as? [String] ?? []
+                // Use FollowService to check following status
+                isFollowing = try await FollowService.shared.checkIfFollowing(
+                    followerId: currentUserId,
+                    followedId: userId
+                )
                 
                 await MainActor.run {
-                    self.isFollowing = isFollowing.contains(userId)
                     self.isLoading = false
                 }
             } catch {
@@ -592,13 +672,30 @@ struct FollowButton: View {
         
         Task {
             do {
-                // In a real app, this would update Firestore to add/remove the follow relationship
                 if isFollowing {
-                    // Unfollow logic would go here
-                    try await Task.sleep(nanoseconds: 800_000_000) // Simulate network delay
+                    // Use FollowService to unfollow
+                    try await FollowService.shared.unfollowUser(
+                        currentUserId: currentUserId,
+                        targetUserId: userId
+                    )
+                    
+                    // Update follower count
+                    await MainActor.run {
+                        if followerCount > 0 {
+                            followerCount -= 1
+                        }
+                    }
                 } else {
-                    // Follow logic would go here
-                    try await Task.sleep(nanoseconds: 800_000_000) // Simulate network delay
+                    // Use FollowService to follow
+                    try await FollowService.shared.followUser(
+                        currentUserId: currentUserId,
+                        targetUserId: userId
+                    )
+                    
+                    // Update follower count
+                    await MainActor.run {
+                        followerCount += 1
+                    }
                 }
                 
                 await MainActor.run {
@@ -617,6 +714,9 @@ struct FollowButton: View {
 
 struct UserProfileView_Previews: PreviewProvider {
     static var previews: some View {
-        UserProfileView(userId: "previewUserId")
+        NavigationView {
+            UserProfileView(userId: "previewUserId", showBackButton: true)
+                .environmentObject(AuthManager())
+        }
     }
 } 
