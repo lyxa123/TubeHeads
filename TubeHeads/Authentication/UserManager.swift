@@ -7,12 +7,18 @@ struct UserData: Codable {
     let email: String
     let username: String
     let dateCreated: Date
+    var followerCount: Int = 0
+    var followingCount: Int = 0
+    var profileImageUrl: String?
     
     enum CodingKeys: String, CodingKey {
         case id
         case email
         case username
         case dateCreated
+        case followerCount
+        case followingCount
+        case profileImageUrl
     }
 }
 
@@ -27,7 +33,9 @@ final class UserManager {
             id: auth.uid,
             email: auth.email ?? "",
             username: username,
-            dateCreated: Date()
+            dateCreated: Date(),
+            followerCount: 0,
+            followingCount: 0
         )
         
         do {
@@ -35,7 +43,9 @@ final class UserManager {
                 "id": userData.id,
                 "email": userData.email,
                 "username": username,
-                "dateCreated": Timestamp(date: userData.dateCreated)
+                "dateCreated": Timestamp(date: userData.dateCreated),
+                "followerCount": 0,
+                "followingCount": 0
             ]
             
             try await userCollection.document(auth.uid).setData(dataDict, merge: true)
@@ -43,7 +53,9 @@ final class UserManager {
             if error.domain == "FIRFirestoreErrorDomain" && error.code == 7 {
                 let minimalData: [String: Any] = [
                     "id": auth.uid,
-                    "username": username
+                    "username": username,
+                    "followerCount": 0,
+                    "followingCount": 0
                 ]
                 
                 do {
@@ -74,12 +86,18 @@ final class UserManager {
             let email = data["email"] as? String ?? ""
             let username = data["username"] as? String ?? "User"
             let dateCreated = (data["dateCreated"] as? Timestamp)?.dateValue() ?? Date()
+            let followerCount = data["followerCount"] as? Int ?? 0
+            let followingCount = data["followingCount"] as? Int ?? 0
+            let profileImageUrl = data["profileImageUrl"] as? String
             
             return UserData(
                 id: id,
                 email: email,
                 username: username,
-                dateCreated: dateCreated
+                dateCreated: dateCreated,
+                followerCount: followerCount,
+                followingCount: followingCount,
+                profileImageUrl: profileImageUrl
             )
         } catch let error as NSError {
             if error.domain == "FIRFirestoreErrorDomain" && error.code == 7 {
@@ -87,12 +105,30 @@ final class UserManager {
                     id: userId, 
                     email: "user@example.com", 
                     username: "User",
-                    dateCreated: Date()
+                    dateCreated: Date(),
+                    followerCount: 0,
+                    followingCount: 0
                 )
             }
             
             throw error
         }
+    }
+    
+    // Update follower count (typically called by FollowService)
+    func updateFollowerCount(userId: String, increment: Int) async throws {
+        let userRef = userCollection.document(userId)
+        try await userRef.updateData([
+            "followerCount": FieldValue.increment(Int64(increment))
+        ])
+    }
+    
+    // Update following count (typically called by FollowService)
+    func updateFollowingCount(userId: String, increment: Int) async throws {
+        let userRef = userCollection.document(userId)
+        try await userRef.updateData([
+            "followingCount": FieldValue.increment(Int64(increment))
+        ])
     }
     
     func usernameExists(_ username: String) async throws -> Bool {
