@@ -325,8 +325,8 @@ struct ProfileView: View {
     @State private var username: String = "tubeheadsfan1"
     @State private var bio: String = "i love television."
     @State private var location: String = "California, US"
-    @State private var followersCount: Int = 90
-    @State private var followingCount: Int = 103
+    @State private var followerCount: Int = 0
+    @State private var followingCount: Int = 0
     @State private var showSignInView: Bool = false
     @State private var showEditProfile: Bool = false
     @State private var profileImage: UIImage? = nil
@@ -339,6 +339,7 @@ struct ProfileView: View {
     @Environment(\.scenePhase) var scenePhase
     @State private var userLists: [(id: String, name: String, description: String, isPrivate: Bool, userId: String, showIds: [String])] = []
     @State private var isLoadingLists = false
+    @State private var isLoadingFollowCounts = false
     
     var body: some View {
         Group {
@@ -379,12 +380,16 @@ struct ProfileView: View {
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
                 // Reload profile when app becomes active
+                guard let userId = authManager.currentUser?.uid else { return }
                 loadUserProfile()
+                loadFollowCounts(userId: userId)
             }
         }
         .sheet(isPresented: $showEditProfile) {
             // Reload profile after editing
+            guard let userId = authManager.currentUser?.uid else { return }
             loadUserProfile()
+            loadFollowCounts(userId: userId)
         } content: {
             NavigationView {
                 EditProfileView(
@@ -409,14 +414,14 @@ struct ProfileView: View {
                     Button(action: {
                         presentationMode.wrappedValue.dismiss()
                     }) {
-                        Image(systemName: "arrow.left")
-                            .font(.title3)
-                            .foregroundColor(.primary)
+                        HStack(spacing: 5) {
+                            Image(systemName: "chevron.left")
+                                .font(.title3)
+                            Text("Back")
+                                .fontWeight(.regular)
+                        }
+                        .foregroundColor(.blue)
                     }
-                    
-                    Text("Profile")
-                        .font(.title2)
-                        .fontWeight(.bold)
                     
                     Spacer()
                     
@@ -487,27 +492,62 @@ struct ProfileView: View {
                 }
                 
                 // Followers and Following
-                HStack(spacing: 24) {
-                    VStack(alignment: .leading) {
-                        Text("\(followersCount)")
-                            .font(.headline)
-                        Text("Followers")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
+                HStack(spacing: 0) {
+                    Spacer()
                     
-                    VStack(alignment: .leading) {
-                        Text("\(followingCount)")
-                            .font(.headline)
-                        Text("Following")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                    NavigationLink(destination: FollowersView(userId: authManager.currentUser?.uid ?? "")) {
+                        VStack(alignment: .center) {
+                            Text("\(followerCount)")
+                                .font(.headline)
+                            Text("Followers")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        .frame(minWidth: 70)
                     }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    NavigationLink(destination: FollowingView(userId: authManager.currentUser?.uid ?? "")) {
+                        VStack(alignment: .center) {
+                            Text("\(followingCount)")
+                                .font(.headline)
+                            Text("Following")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        .frame(minWidth: 70)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    VStack(alignment: .center) {
+                        Text("\(watchedShows.count)")
+                            .font(.headline)
+                        Text("Watched")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .frame(minWidth: 70)
+                    
+                    VStack(alignment: .center) {
+                        Text("\(userLists.count)")
+                            .font(.headline)
+                        Text("Lists")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .frame(minWidth: 70)
                     
                     Spacer()
                 }
                 .padding(.horizontal)
-                .padding(.vertical, 8)
+                .padding(.vertical, 16)
+                .overlay(
+                    isLoadingFollowCounts ? ProgressView()
+                        .scaleEffect(0.7)
+                        .padding(.trailing, 30)
+                        : nil,
+                    alignment: .trailing
+                )
                 
                 Divider()
                     .padding(.horizontal)
@@ -658,6 +698,9 @@ struct ProfileView: View {
                     }
                 }
                 
+                // Fetch follower and following counts
+                loadFollowCounts(userId: userId)
+                
                 // Update UI with profile data
                 await MainActor.run {
                     self.bio = profile.bio
@@ -671,6 +714,32 @@ struct ProfileView: View {
                     self.errorMessage = "Failed to load profile: \(error.localizedDescription)"
                     self.isLoading = false
                     self.isImageLoading = false
+                }
+            }
+        }
+    }
+    
+    // Add a new function to load follow counts
+    private func loadFollowCounts(userId: String) {
+        isLoadingFollowCounts = true
+        
+        Task {
+            do {
+                // Get follower count
+                let followers = try await FollowService.shared.getFollowerCount(userId: userId)
+                
+                // Get following count
+                let following = try await FollowService.shared.getFollowingCount(userId: userId)
+                
+                await MainActor.run {
+                    self.followerCount = followers
+                    self.followingCount = following
+                    self.isLoadingFollowCounts = false
+                }
+            } catch {
+                print("Error fetching follow counts: \(error)")
+                await MainActor.run {
+                    self.isLoadingFollowCounts = false
                 }
             }
         }
@@ -703,6 +772,9 @@ struct ProfileView: View {
                     profileImage: image,
                     isPublic: isPublic
                 )
+                
+                // Reload follow counts since profile updates might affect visibility
+                loadFollowCounts(userId: userId)
                 
                 await MainActor.run {
                     self.errorMessage = nil

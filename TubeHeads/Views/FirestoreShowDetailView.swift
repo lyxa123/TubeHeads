@@ -848,7 +848,7 @@ struct AddToListView: View {
             return 
         }
         
-        print("🔍 Checking list statuses for show: \(showId)")
+        print("Checking list statuses for show: \(showId)")
         
         // Clear existing statuses to start fresh
         currentListStatuses = [:]
@@ -902,7 +902,7 @@ struct AddToListView: View {
                     selectedListIds.remove(listId)
                 }
                 
-                print("Show \(showId) in list '\(list.name)' (\(listId)): \(showExists ? "✅ YES" : "❌ NO")")
+                print("Show \(showId) in list '\(list.name)' (\(listId)): \(showExists ? "[YES]" : "[NO]")")
             } catch {
                 print("Error checking list status for '\(list.name)' (\(listId)): \(error)")
                 // Default to not in list if there's an error
@@ -910,7 +910,7 @@ struct AddToListView: View {
             }
         }
         
-        print("🔍 Found show in \(listStatusCount) of \(listsToCheck.count) lists")
+        print("Found show in \(listStatusCount) of \(listsToCheck.count) lists")
     }
     
     private func loadListsAfterCreation() async {

@@ -689,10 +689,14 @@ struct ListDetailView: View {
     @State private var selectedShows: Set<String> = []
     @State private var showingPrivacyConfirmation = false
     @State private var showingDeleteConfirmation = false
+    @State private var showingDeleteListConfirmation = false
+    @State private var showingRemoveLikedListConfirmation = false
     @State private var randomShow: FirestoreShow? = nil
     @State private var showingRandomShow = false
     @State private var isSpinningRoulette = false
+    @State private var isLikedByUser = false
     @EnvironmentObject private var authManager: AuthManager
+    @Environment(\.presentationMode) private var presentationMode
     
     init(list: ShowList) {
         _list = State(initialValue: list)
@@ -838,8 +842,24 @@ struct ListDetailView: View {
                             Label(list.isPrivate ? "Make Public" : "Make Private", 
                                   systemImage: list.isPrivate ? "globe" : "lock")
                         }
+                        
+                        Button(role: .destructive, action: {
+                            showingDeleteListConfirmation = true
+                        }) {
+                            Label("Delete List", systemImage: "trash")
+                        }
                     } label: {
                         Image(systemName: "ellipsis.circle")
+                    }
+                } else {
+                    // Menu for non-owners (just the option to remove from liked lists)
+                    if isLikedByUser {
+                        Button(action: {
+                            showingRemoveLikedListConfirmation = true
+                        }) {
+                            Image(systemName: "heart.fill")
+                                .foregroundColor(.red)
+                        }
                     }
                 }
             }
@@ -895,8 +915,35 @@ struct ListDetailView: View {
         } message: {
             Text("Are you sure you want to remove the selected shows from this list?")
         }
+        .confirmationDialog(
+            "Delete List",
+            isPresented: $showingDeleteListConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                deleteList()
+            }
+            
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to delete this list? This action cannot be undone.")
+        }
+        .confirmationDialog(
+            "Remove from Liked Lists",
+            isPresented: $showingRemoveLikedListConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                removeFromLikedLists()
+            }
+            
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to remove this list from your liked lists?")
+        }
         .task {
             await fetchShowsData(listId: list.id ?? "")
+            await checkIfLikedByUser()
         }
         .sheet(isPresented: $showingRandomShow, onDismiss: {
             randomShow = nil
@@ -1057,6 +1104,66 @@ struct ListDetailView: View {
             randomShow = shows[randomIndex]
             showingRandomShow = true
             isSpinningRoulette = false
+        }
+    }
+    
+    private func deleteList() {
+        guard let listId = list.id else { return }
+        
+        // Verify user ownership before allowing deletion
+        guard authManager.currentUser?.uid == list.userId else {
+            print("Error: User does not own this list and cannot delete it")
+            return
+        }
+        
+        Task {
+            do {
+                // Delete the list from Firestore
+                try await ListService.shared.deleteList(listId: listId)
+                
+                // Navigate back after deletion
+                await MainActor.run {
+                    // Go back to the lists view
+                    presentationMode.wrappedValue.dismiss()
+                }
+            } catch {
+                print("Error deleting list: \(error)")
+            }
+        }
+    }
+    
+    private func checkIfLikedByUser() async {
+        guard let listId = list.id, let userId = authManager.currentUser?.uid else { return }
+        
+        // Don't check if the user is the owner
+        if userId == list.userId { return }
+        
+        do {
+            let liked = try await ListService.shared.isListLiked(listId: listId, userId: userId)
+            await MainActor.run {
+                isLikedByUser = liked
+            }
+        } catch {
+            print("Error checking if list is liked: \(error)")
+        }
+    }
+    
+    private func removeFromLikedLists() {
+        guard let listId = list.id, let userId = authManager.currentUser?.uid else { return }
+        
+        Task {
+            do {
+                // Remove from liked lists
+                try await ListService.shared.unlikeList(listId: listId, userId: userId)
+                
+                await MainActor.run {
+                    isLikedByUser = false
+                    // Navigate back
+                    presentationMode.wrappedValue.dismiss()
+                }
+            } catch {
+                print("Error removing list from liked lists: \(error)")
+            }
         }
     }
 }
