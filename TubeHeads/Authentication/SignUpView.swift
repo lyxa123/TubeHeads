@@ -63,7 +63,10 @@ final class SignUpViewModel: ObservableObject {
             
             // Refresh token to ensure valid token
             print("SignUpViewModel: Refreshing auth token after signup")
-            try await authManager.refreshAuthToken()
+            let token = try await authManager.refreshAuthToken()
+            // use the token or log it
+            print("Token: \(token)")
+
             
             return
         } catch {

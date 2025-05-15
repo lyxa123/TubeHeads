@@ -2,6 +2,7 @@ import Foundation
 import FirebaseCore
 import FirebaseAuth
 
+// Simple model for auth results (no caching here)
 struct AuthDataResultModel {
     let uid: String
     let email: String?
@@ -9,7 +10,6 @@ struct AuthDataResultModel {
     init(user: User) {
         self.uid = user.uid
         self.email = user.email
-        
     }
 }
 
@@ -29,14 +29,12 @@ final class AuthenticationManager {
     func createUser(email: String, password: String) async throws -> AuthDataResultModel {
         let authDataResult = try await Auth.auth().createUser(withEmail: email, password: password)
         return AuthDataResultModel(user: authDataResult.user)
-                                        
     }
     
     @discardableResult
     func signInUser(email: String, password: String) async throws -> AuthDataResultModel {
         let authDataResult = try await Auth.auth().signIn(withEmail: email, password: password)
         return AuthDataResultModel(user: authDataResult.user)
-        
     }
     
     func resetPassword(email: String) async throws {
@@ -47,7 +45,6 @@ final class AuthenticationManager {
         guard let user = Auth.auth().currentUser else {
             throw URLError(.badServerResponse)
         }
-        
         try await user.updatePassword(to: password)
     }
     
@@ -55,12 +52,10 @@ final class AuthenticationManager {
         guard let user = Auth.auth().currentUser else {
             throw URLError(.badServerResponse)
         }
-        
         try await user.updateEmail(to: email)
     }
     
     func SignOut() throws {
         try Auth.auth().signOut()
     }
-    
 }
