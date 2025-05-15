@@ -2,40 +2,106 @@ import SwiftUI
 import FirebaseAuth
 
 class AuthManager: ObservableObject {
-    @Published var currentUser: AuthDataResultModel?
+    // New private cached user struct for offline support
+    struct CachedAuthUser: Codable {
+        let uid: String
+        let email: String?
+        var isEmailVerified: Bool
+        var username: String?
+        
+        init(uid: String, email: String?, isEmailVerified: Bool, username: String? = nil) {
+            self.uid = uid
+            self.email = email
+            self.isEmailVerified = isEmailVerified
+            self.username = username
+        }
+        
+        init(fromUser user: User, username: String? = nil) {
+            self.uid = user.uid
+            self.email = user.email
+            self.isEmailVerified = user.isEmailVerified
+            self.username = username
+        }
+    }
+
+    // Published properties remain the same, but currentUser is now CachedAuthUser?
+        @Published var currentUser: CachedAuthUser? {
+        didSet {
+            cacheCurrentUser()
+        }
+    }
     @Published var isSignedIn: Bool = false
     @Published var isEmailVerified: Bool = false
     
+    private let userDefaultsKey = "CachedAuthUserKey"
+    
     init() {
+        // Load cached user for offline support
+        loadCachedUser()
+        
         Auth.auth().addStateDidChangeListener { [weak self] _, user in
             if let user = user {
-                self?.currentUser = AuthDataResultModel(user: user)
-                self?.isSignedIn = true
-                self?.isEmailVerified = user.isEmailVerified
+                Task {
+                    let username = await self?.fetchUsername(userId: user.uid)
+                    DispatchQueue.main.async {
+                        let cachedUser = CachedAuthUser(fromUser: user, username: username)
+                        self?.currentUser = cachedUser
+                        self?.isSignedIn = true
+                        self?.isEmailVerified = user.isEmailVerified
+                    }
+                }
             } else {
-                self?.currentUser = nil
-                self?.isSignedIn = false
-                self?.isEmailVerified = false
+                DispatchQueue.main.async {
+                    self?.currentUser = nil
+                    self?.isSignedIn = false
+                    self?.isEmailVerified = false
+                }
             }
         }
     }
     
-    // Simple debug function to check authentication state
-    func debugAuthState() {
-        if Auth.auth().currentUser != nil {
-            print("User is signed in")
-        } else {
-            print("No user is currently signed in")
+    // MARK: - Cache Management
+    
+    private func cacheCurrentUser() {
+        guard let user = currentUser else {
+            UserDefaults.standard.removeObject(forKey: userDefaultsKey)
+            return
+        }
+        do {
+            let data = try JSONEncoder().encode(user)
+            UserDefaults.standard.set(data, forKey: userDefaultsKey)
+        } catch {
+            print("AuthManager: Failed to cache user: \(error.localizedDescription)")
         }
     }
+    
+    private func loadCachedUser() {
+        guard let data = UserDefaults.standard.data(forKey: userDefaultsKey),
+              let cachedUser = try? JSONDecoder().decode(CachedAuthUser.self, from: data) else {
+            return
+        }
+        currentUser = cachedUser
+        isSignedIn = true
+        isEmailVerified = cachedUser.isEmailVerified
+    }
+    
+    // MARK: - Auth Functions
     
     func createAccount(email: String, password: String, username: String) async throws {
         do {
             let authResult = try await AuthenticationManager.shared.createUser(email: email, password: password)
             try await UserManager.shared.createNewUser(auth: authResult, username: username)
             
-            currentUser = authResult
-            isSignedIn = true
+            let cachedUser = CachedAuthUser(uid: authResult.uid,
+                                            email: authResult.email,
+                                            isEmailVerified: false,
+                                            username: username)
+            
+            DispatchQueue.main.async {
+                self.currentUser = cachedUser
+                self.isSignedIn = true
+                self.isEmailVerified = false
+            }
         } catch {
             throw error
         }
@@ -44,14 +110,34 @@ class AuthManager: ObservableObject {
     func signIn(email: String, password: String) async throws {
         do {
             let authResult = try await AuthenticationManager.shared.signInUser(email: email, password: password)
-            currentUser = authResult
-            isSignedIn = true
+            let username = await fetchUsername(userId: authResult.uid)
+            let cachedUser = CachedAuthUser(uid: authResult.uid,
+                                            email: authResult.email,
+                                            isEmailVerified: false,
+                                            username: username)
             
-            // Check email verification status
-            if let user = Auth.auth().currentUser {
-                // Reload user to get the latest verification status
-                try await user.reload()
-                isEmailVerified = user.isEmailVerified
+            DispatchQueue.main.async {
+                self.currentUser = cachedUser
+                self.isSignedIn = true
+                
+                // Reload user to update verification status
+                Task {
+                    do {
+                        try await Auth.auth().currentUser?.reload()
+                        DispatchQueue.main.async {
+                            if let user = Auth.auth().currentUser {
+                                self.isEmailVerified = user.isEmailVerified
+                                // Update cached user accordingly
+                                self.currentUser?.isEmailVerified = user.isEmailVerified
+                            }
+                        }
+                    } catch {
+                        DispatchQueue.main.async {
+                            self.isEmailVerified = cachedUser.isEmailVerified
+                            print("AuthManager: Reload failed, using cached email verification")
+                        }
+                    }
+                }
             }
         } catch {
             throw error
@@ -62,23 +148,21 @@ class AuthManager: ObservableObject {
         guard let user = Auth.auth().currentUser else {
             throw NSError(domain: "AuthError", code: 1, userInfo: [NSLocalizedDescriptionKey: "No user signed in"])
         }
-        
-        do {
-            let tokenResult = try await user.getIDTokenResult(forcingRefresh: true)
-            return tokenResult.token
-        } catch {
-            throw error
-        }
+        let tokenResult = try await user.getIDTokenResult(forcingRefresh: true)
+        return tokenResult.token
     }
     
     func signOut() {
         do {
             try AuthenticationManager.shared.SignOut()
-            currentUser = nil
-            isSignedIn = false
-            isEmailVerified = false
+            DispatchQueue.main.async {
+                self.currentUser = nil
+                self.isSignedIn = false
+                self.isEmailVerified = false
+            }
+            UserDefaults.standard.removeObject(forKey: userDefaultsKey)
         } catch {
-            // Silently handle sign out errors
+            print("AuthManager: Sign out error: \(error.localizedDescription)")
         }
     }
     
@@ -95,35 +179,34 @@ class AuthManager: ObservableObject {
     }
     
     func getCurrentUsername() async -> String? {
-        guard let userId = currentUser?.uid else { return nil }
-        
-        do {
-            let userData = try await UserManager.shared.getUser(userId: userId)
-            return userData.username
-        } catch {
-            return "User" // Return a default value so the app can continue
+        if let username = currentUser?.username {
+            return username
         }
+        guard let uid = currentUser?.uid else { return nil }
+        return await fetchUsername(userId: uid)
     }
     
     func checkEmailVerification() async -> Bool {
         guard let user = Auth.auth().currentUser else {
+            DispatchQueue.main.async {
+                self.isEmailVerified = false
+            }
             return false
         }
         
         do {
-            // Reload user to get the latest verification status
             try await user.reload()
-            
-            // Update the published property
-            isEmailVerified = user.isEmailVerified
-            
-            // Log verification status for debugging
-            print("Email verification status: \(user.isEmailVerified)")
-            
+            DispatchQueue.main.async {
+                self.isEmailVerified = user.isEmailVerified
+                self.currentUser?.isEmailVerified = user.isEmailVerified
+            }
             return user.isEmailVerified
         } catch {
-            print("Error reloading user: \(error.localizedDescription)")
-            return false
+            DispatchQueue.main.async {
+                self.isEmailVerified = user.isEmailVerified
+            }
+            print("AuthManager: Reload failed, using cached email verification")
+            return user.isEmailVerified
         }
     }
     
@@ -131,13 +214,19 @@ class AuthManager: ObservableObject {
         guard let user = Auth.auth().currentUser else {
             throw NSError(domain: "AuthError", code: 1, userInfo: [NSLocalizedDescriptionKey: "No user signed in"])
         }
-        
+        try await user.sendEmailVerification()
+        print("Verification email sent to: \(user.email ?? "unknown email")")
+    }
+    
+    // MARK: - Helper to fetch username
+    
+    private func fetchUsername(userId: String) async -> String? {
         do {
-            try await user.sendEmailVerification()
-            print("Verification email sent to: \(user.email ?? "unknown email")")
+            let userData = try await UserManager.shared.getUser(userId: userId)
+            return userData.username
         } catch {
-            print("Error sending verification email: \(error.localizedDescription)")
-            throw error
+            print("AuthManager: Failed to fetch username: \(error.localizedDescription)")
+            return nil
         }
     }
-} 
+}
