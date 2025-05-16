@@ -112,46 +112,45 @@ struct SignInView: View {
             }
             .disabled(isLoading)
             
-            // Use biometrics button similar to Bank of America app
+            // Improved biometric authentication button
             if viewModel.isBiometricAvailable {
-                Button {
-                    Task {
-                        await performBiometricAuthentication()
-                    }
-                } label: {
-                    Text("Use biometrics")
-                        .font(.headline)
-                        .foregroundColor(.blue)
-                        .padding(.top, 10)
-                }
-                .disabled(isLoading)
-                
-                // Biometric type indicator
                 HStack {
-                    if viewModel.biometricManager.biometricType == .faceID {
-                        Image(systemName: "faceid")
-                            .foregroundColor(.gray)
-                    } else {
-                        Image(systemName: "touchid")
-                            .foregroundColor(.gray)
-                    }
-                    
-                    Text("Biometric login available")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    
                     Spacer()
                     
-                    // Remove saved credentials button
                     Button {
-                        viewModel.removeBiometricCredentials()
+                        Task {
+                            await performBiometricAuthentication()
+                        }
                     } label: {
-                        Text("Remove")
-                            .font(.caption)
-                            .foregroundColor(.red)
+                        HStack(spacing: 10) {
+                            // Biometric type icon
+                            Image(systemName: viewModel.biometricManager.biometricType == .faceID ? "faceid" : "touchid")
+                                .font(.system(size: 20))
+                            
+                            Text("Sign in with \(viewModel.biometricManager.biometricType == .faceID ? "Face ID" : "Touch ID")")
+                                .font(.headline)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 20)
+                        .background(Color.blue)
+                        .cornerRadius(10)
                     }
+                    .disabled(isLoading)
+                    
+                    Spacer()
                 }
-                .padding(.top, 5)
+                .padding(.top, 10)
+                
+                // Button to remove saved biometric credentials
+                Button {
+                    viewModel.removeBiometricCredentials()
+                } label: {
+                    Text("Remove saved biometric credentials")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                .padding(.top, 8)
             }
             
             NavigationLink {
