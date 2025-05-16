@@ -292,7 +292,7 @@ struct ActivityCard: View {
         .padding(.vertical, 8)
         .background(
             NavigationLink(
-                destination: UserProfileView(userId: activity.userId, showBackButton: true),
+                destination: UserProfileView(userId: activity.userId),
                 isActive: $navigateToUserProfile,
                 label: { EmptyView() }
             )

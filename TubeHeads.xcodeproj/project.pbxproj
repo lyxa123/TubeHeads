@@ -47,16 +47,6 @@
 			path = TubeHeads;
 			sourceTree = "<group>";
 		};
-		223373722D8B82150020B861 /* TubeHeadsTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = TubeHeadsTests;
-			sourceTree = "<group>";
-		};
-		2233737C2D8B82150020B861 /* TubeHeadsUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = TubeHeadsUITests;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,8 +87,6 @@
 			isa = PBXGroup;
 			children = (
 				2233735F2D8B82140020B861 /* TubeHeads */,
-				223373722D8B82150020B861 /* TubeHeadsTests */,
-				2233737C2D8B82150020B861 /* TubeHeadsUITests */,
 				223373BD2D8BC9090020B861 /* Frameworks */,
 				2233735E2D8B82140020B861 /* Products */,
 			);
@@ -168,9 +156,6 @@
 			dependencies = (
 				223373712D8B82150020B861 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				223373722D8B82150020B861 /* TubeHeadsTests */,
-			);
 			name = TubeHeadsTests;
 			packageProductDependencies = (
 			);
@@ -190,9 +175,6 @@
 			);
 			dependencies = (
 				2233737B2D8B82150020B861 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				2233737C2D8B82150020B861 /* TubeHeadsUITests */,
 			);
 			name = TubeHeadsUITests;
 			packageProductDependencies = (

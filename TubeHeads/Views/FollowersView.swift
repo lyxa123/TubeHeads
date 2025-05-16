@@ -38,7 +38,7 @@ struct FollowersView: View {
                 // List of followers
                 List {
                     ForEach(followers, id: \.id) { follower in
-                        NavigationLink(destination: UserProfileView(userId: follower.id, showBackButton: false)) {
+                        NavigationLink(destination: UserProfileView(userId: follower.id)) {
                             UserFollowRow(user: follower)
                         }
                     }
@@ -121,7 +121,7 @@ struct FollowingView: View {
                 // List of people being followed
                 List {
                     ForEach(following, id: \.id) { user in
-                        NavigationLink(destination: UserProfileView(userId: user.id, showBackButton: false)) {
+                        NavigationLink(destination: UserProfileView(userId: user.id)) {
                             UserFollowRow(user: user)
                         }
                     }
