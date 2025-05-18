@@ -21,7 +21,7 @@ struct EmailVerificationView: View {
                     Image(systemName: "chevron.left")
                     Text("Back")
                 }
-                .foregroundColor(.blue)
+                .foregroundStyle(Color(hex: "#57b9ff"))
                 .padding(.leading)
                 .padding(.top, 10)
             }
@@ -46,7 +46,7 @@ struct EmailVerificationView: View {
                 
                 Text(Auth.auth().currentUser?.email ?? "your email address")
                     .font(.headline)
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color(hex: "#57b9ff"))
                     .padding(.bottom, 10)
                 
                 Text("Please check your inbox and click the verification link to continue using TubeHeads.")
