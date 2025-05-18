@@ -64,15 +64,29 @@ struct HomepageView: View {
                     }) {
                         Image(systemName: "line.3.horizontal")
                             .imageScale(.large)
+                            .foregroundStyle(Color(hex: "#57b9ff"))
+                        Text("Menu")
+                            .font(.subheadline)
+                            .foregroundStyle(Color(hex: "#57b9ff"))
                     }
+                }
+                
+                ToolbarItem(placement: .principal) {
+                    Image("TubeHeads_Logo")
+                        .resizable()
+                        .scaledToFit()
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         showSearch = true
                     }) {
+                        Text("Search")
+                            .font(.subheadline)
+                            .foregroundStyle(Color(hex: "#57b9ff"))
                         Image(systemName: "magnifyingglass")
                             .imageScale(.large)
+                            .foregroundStyle(Color(hex: "#57b9ff"))
                     }
                 }
             }

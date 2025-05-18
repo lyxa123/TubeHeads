@@ -16,8 +16,9 @@ struct AuthenticationView: View {
                     .clipShape(Circle())
                 
                 Text("TubeHeads")
-                    .font(.system(size: 40, weight: .bold))
-                    .foregroundColor(.black)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.horizontal)
                 
                 Text("Welcome to TubeHeads")
                     .font(.headline)
