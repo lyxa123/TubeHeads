@@ -738,7 +738,7 @@ struct ListDetailView: View {
                                 .font(.headline)
                                 .padding()
                                 .frame(maxWidth: .infinity)
-                                .background(Color.blue)
+                                .background(Color(hex: "#77b1d4"))
                                 .foregroundColor(.white)
                                 .cornerRadius(10)
                                 .padding(.top, 8)
@@ -1193,7 +1193,7 @@ struct ShowGridItemView: View {
     let show: FirestoreShow
     
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .center) {
             // Poster image
             if let posterURL = show.posterURL {
                 AsyncImage(url: posterURL) { phase in
@@ -1207,10 +1207,11 @@ struct ShowGridItemView: View {
                     case .success(let image):
                         image
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
+                            .aspectRatio(2/3, contentMode: .fit)
                             .frame(height: 200)
                             .cornerRadius(8)
                             .clipped()
+                            .scaledToFill()
                     case .failure:
                         Rectangle()
                             .fill(Color.gray.opacity(0.3))
@@ -1241,7 +1242,8 @@ struct ShowGridItemView: View {
             Text(show.name)
                 .font(.subheadline)
                 .fontWeight(.medium)
-                .lineLimit(2)
+                .lineLimit(1)
+                .foregroundColor(Color(hex: "57b9ff"))
             
             // Release year
             Text(show.releaseYear)

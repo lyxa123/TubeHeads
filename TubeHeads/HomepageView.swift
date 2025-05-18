@@ -64,15 +64,29 @@ struct HomepageView: View {
                     }) {
                         Image(systemName: "line.3.horizontal")
                             .imageScale(.large)
+                            .foregroundStyle(Color(hex: "#57b9ff"))
+                        Text("Menu")
+                            .font(.subheadline)
+                            .foregroundStyle(Color(hex: "#57b9ff"))
                     }
+                }
+                
+                ToolbarItem(placement: .principal) {
+                    Image("TubeHeads_Logo")
+                        .resizable()
+                        .scaledToFit()
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         showSearch = true
                     }) {
+                        Text("Search")
+                            .font(.subheadline)
+                            .foregroundStyle(Color(hex: "#57b9ff"))
                         Image(systemName: "magnifyingglass")
                             .imageScale(.large)
+                            .foregroundStyle(Color(hex: "#57b9ff"))
                     }
                 }
             }
@@ -113,6 +127,7 @@ struct SideMenuView: View {
     @Binding var showSignInView: Bool
     @State private var navigateToSettings = false
     @State private var navigateToProfile = false
+    @State private var navigateToSearchFriends = false
     @State private var navigateToWatchlist = false
     @State private var navigateToLists = false
     @State private var navigateToReviews = false
@@ -165,9 +180,9 @@ struct SideMenuView: View {
                         }
                     }
                     .padding(.horizontal)
-                    .padding(.vertical, 24)
+                    .padding(.vertical, 40)
                     
-                    // Add divider 
+                    // Add divider
                     Divider()
                         .padding(.horizontal)
                     
@@ -201,6 +216,31 @@ struct SideMenuView: View {
                         .contentShape(Rectangle())
                     }
                     
+                    // Search Friends (functional)
+                    Button {
+                        withAnimation {
+                            showMenu = false
+                        }
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            navigateToSearchFriends = true
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "person.2.fill") // or any icon you like
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
+                            Text("Search Friends")
+                                .font(.headline)
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 12)
+                        .foregroundColor(.primary)
+                        .contentShape(Rectangle())
+                    }
+
                     // Watchlist (functional)
                     Button {
                         withAnimation {
@@ -366,6 +406,11 @@ struct SideMenuView: View {
                     NavigationLink(destination: ProfileView().environmentObject(authManager), isActive: $navigateToProfile) {
                         EmptyView()
                     }
+                    
+                    NavigationLink(destination: SearchFriendsView(), isActive: $navigateToSearchFriends) {
+                        EmptyView()
+                    }
+
                     
                     NavigationLink(destination: WatchlistView().environmentObject(authManager), isActive: $navigateToWatchlist) {
                         EmptyView()

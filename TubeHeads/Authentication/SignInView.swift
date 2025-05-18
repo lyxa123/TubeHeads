@@ -157,7 +157,7 @@ struct SignInView: View {
                 SignUpView(showSignInView: $showSignInView)
             } label: {
                 Text("Don't have an account? Sign Up")
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color(hex: "#517891"))
                     .padding(.top, 15)
             }
             
@@ -200,7 +200,7 @@ struct CheckboxToggleStyle: ToggleStyle {
             Image(systemName: configuration.isOn ? "checkmark.square" : "square")
                 .resizable()
                 .frame(width: 20, height: 20)
-                .foregroundColor(configuration.isOn ? .blue : .gray)
+                .foregroundColor(configuration.isOn ? Color(hex: "#57b9ff") : .gray)
                 .font(.system(size: 20, weight: .regular))
                 .onTapGesture {
                     configuration.isOn.toggle()
