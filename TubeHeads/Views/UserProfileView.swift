@@ -14,8 +14,6 @@ struct UserProfileData {
 
 struct UserProfileView: View {
     let userId: String
-    // Add parameter to control whether to show the back button
-    var showBackButton: Bool = false
     
     // Initialize directly with default values
     @State private var user = UserProfileData()
@@ -33,27 +31,6 @@ struct UserProfileView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                // Header with back button and title
-                HStack {
-                    if showBackButton {
-                        Button(action: {
-                            presentationMode.wrappedValue.dismiss()
-                        }) {
-                            HStack(spacing: 5) {
-                                Image(systemName: "chevron.left")
-                                    .font(.title3)
-                                Text("Back")
-                                    .fontWeight(.regular)
-                            }
-                            .foregroundStyle(Color(hex: "#57b9ff"))
-                        }
-                    }
-                    
-                    Spacer()
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 8)
-                
                 // Username with lock icon if profile is private
                 HStack {
                     Text(user.username)
@@ -715,7 +692,7 @@ struct FollowButton: View {
 struct UserProfileView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView {
-            UserProfileView(userId: "previewUserId", showBackButton: true)
+            UserProfileView(userId: "previewUserId")
                 .environmentObject(AuthManager())
         }
     }

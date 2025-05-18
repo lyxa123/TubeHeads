@@ -358,10 +358,19 @@ struct ReviewCard: View {
         }
         .sheet(isPresented: $showUserProfile) {
             NavigationView {
-                UserProfileView(userId: review.userId, showBackButton: true)
+                UserProfileView(userId: review.userId)
                     .environmentObject(authManager)
             }
         }
+        // Actual navigation link hidden in background
+        .background(
+            NavigationLink(
+                destination: UserProfileView(userId: review.userId),
+                isActive: $showUserProfile,
+                label: { EmptyView() }
+            )
+            .opacity(0)
+        )
     }
 }
 
