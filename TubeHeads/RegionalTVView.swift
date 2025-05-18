@@ -26,7 +26,7 @@ struct RegionalTVView: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
                         .background(Color(hex: "#57b9ff").opacity(0.2))
-                        .foregroundColor(Color(hex: "#517891"))
+                        .foregroundColor(Color(hex: "#77b1d4"))
                         .cornerRadius(10)
                     }
                 }
