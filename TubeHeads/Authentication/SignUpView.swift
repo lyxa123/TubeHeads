@@ -63,7 +63,10 @@ final class SignUpViewModel: ObservableObject {
             
             // Refresh token to ensure valid token
             print("SignUpViewModel: Refreshing auth token after signup")
-            try await authManager.refreshAuthToken()
+            let token = try await authManager.refreshAuthToken()
+            // use the token or log it
+            print("Token: \(token)")
+
             
             return
         } catch {
@@ -202,7 +205,7 @@ struct SignUpView: View {
                 }
                 .frame(height: 55)
                 .frame(maxWidth: .infinity)
-                .background(Color(hex: "#f6bebe"))
+                .background(Color(hex: "#77b1d4"))
                 .cornerRadius(10)
                 .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
             }

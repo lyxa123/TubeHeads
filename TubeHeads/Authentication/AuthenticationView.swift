@@ -9,9 +9,15 @@ struct AuthenticationView: View {
         VStack(spacing: 30) {
             // Logo and title section
             VStack(spacing: 10) {
+                Image("TubeHeads_Logo")
+                    .resizable()
+                    .ignoresSafeArea()
+                    .aspectRatio(contentMode: .fit)
+                    .clipShape(Circle())
+                
                 Text("TubeHeads")
                     .font(.system(size: 40, weight: .bold))
-                    .foregroundColor(.blue)
+                    .foregroundColor(.black)
                 
                 Text("Welcome to TubeHeads")
                     .font(.headline)
@@ -35,7 +41,7 @@ struct AuthenticationView: View {
                 }
                 .frame(height: 55)
                 .frame(maxWidth: .infinity)
-                .background(Color(hex: "#f6bebe"))
+                .background(Color(hex: "#77b1d4"))
                 .cornerRadius(10)
                 .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
             }
@@ -54,7 +60,7 @@ struct AuthenticationView: View {
                 }
                 .frame(height: 55)
                 .frame(maxWidth: .infinity)
-                .background(Color(hex: "#f6bebe"))
+                .background(Color(hex: "#77b1d4"))
                 .cornerRadius(10)
                 .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
             }
@@ -63,11 +69,15 @@ struct AuthenticationView: View {
             
             // Footer text
             Text("Track and discover your favorite TV shows")
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundColor(.gray)
-                .padding(.bottom, 8)
+                .padding(.bottom, 40)
         }
         .padding()
+        /*.background {
+            Color(hex: "#57b9ff").opacity(0.2)
+            .ignoresSafeArea()
+        }*/
     }
 }
 
