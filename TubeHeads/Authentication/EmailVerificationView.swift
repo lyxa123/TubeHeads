@@ -34,7 +34,7 @@ struct EmailVerificationView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 100, height: 100)
-                    .foregroundColor(Color(hex: "#f6bebe"))
+                    .foregroundColor(Color(hex: "#517891"))
                     .padding(.bottom, 20)
                 
                 Text("Email Verification Required")
@@ -105,7 +105,7 @@ struct EmailVerificationView: View {
                         }
                         .frame(height: 55)
                         .frame(maxWidth: .infinity)
-                        .background(Color(hex: "#f6bebe").opacity(0.7))
+                        .background(Color(hex: "#77b1d4").opacity(0.7))
                         .cornerRadius(10)
                         .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
                     }
@@ -151,7 +151,7 @@ struct EmailVerificationView: View {
                         }
                         .frame(height: 55)
                         .frame(maxWidth: .infinity)
-                        .background(Color(hex: "#f6bebe"))
+                        .background(Color(hex: "#77b1d4"))
                         .cornerRadius(10)
                         .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
                     }
