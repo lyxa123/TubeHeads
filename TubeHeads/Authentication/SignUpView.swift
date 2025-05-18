@@ -215,7 +215,7 @@ struct SignUpView: View {
                 SignInView(showSignInView: $showSignInView)
             } label: {
                 Text("Already have an account? Sign In")
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color(hex: "#517891"))
                     .padding(.top, 15)
             }
             

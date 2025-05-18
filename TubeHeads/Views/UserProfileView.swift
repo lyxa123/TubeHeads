@@ -211,7 +211,7 @@ struct UserProfileView: View {
                                     NavigationLink(destination: UserListsView(userId: userId)) {
                                         Text("See All")
                                             .font(.subheadline)
-                                            .foregroundColor(.blue)
+                                            .foregroundColor(Color(hex: "#57b9ff"))
                                     }
                                 }
                             }

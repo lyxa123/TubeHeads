@@ -420,7 +420,7 @@ struct ProfileView: View {
                             Text("Back")
                                 .fontWeight(.regular)
                         }
-                        .foregroundColor(.blue)
+                        .foregroundStyle(Color(hex: "#57b9ff"))
                     }
                     
                     Spacer()

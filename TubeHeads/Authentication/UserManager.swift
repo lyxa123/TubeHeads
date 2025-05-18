@@ -2,7 +2,7 @@ import Foundation
 import FirebaseFirestore
 import FirebaseFirestoreSwift
 
-struct UserData: Codable {
+struct UserData: Codable, Identifiable {
     let id: String
     let email: String
     let username: String
@@ -29,6 +29,8 @@ final class UserManager {
     private init() { }
     
     func createNewUser(auth: AuthDataResultModel, username: String) async throws {
+        let usernameLowercased = username.lowercased()
+        
         let userData = UserData(
             id: auth.uid,
             email: auth.email ?? "",
@@ -43,6 +45,7 @@ final class UserManager {
                 "id": userData.id,
                 "email": userData.email,
                 "username": username,
+                "username_lowercase": usernameLowercased,
                 "dateCreated": Timestamp(date: userData.dateCreated),
                 "followerCount": 0,
                 "followingCount": 0
@@ -54,6 +57,7 @@ final class UserManager {
                 let minimalData: [String: Any] = [
                     "id": auth.uid,
                     "username": username,
+                    "username_lowercase": usernameLowercased,
                     "followerCount": 0,
                     "followingCount": 0
                 ]
@@ -102,8 +106,8 @@ final class UserManager {
         } catch let error as NSError {
             if error.domain == "FIRFirestoreErrorDomain" && error.code == 7 {
                 return UserData(
-                    id: userId, 
-                    email: "user@example.com", 
+                    id: userId,
+                    email: "user@example.com",
                     username: "User",
                     dateCreated: Date(),
                     followerCount: 0,
@@ -115,7 +119,25 @@ final class UserManager {
         }
     }
     
-    // Update follower count (typically called by FollowService)
+    // Updated: Search users by username prefix (case insensitive) with limit
+    func searchUsersByUsername(query: String, limit: Int = 20) async throws -> [UserData] {
+        let lowercasedQuery = query.lowercased()
+        guard !lowercasedQuery.isEmpty else { return [] }
+        
+        let endQuery = lowercasedQuery + "\u{f8ff}"
+        
+        let snapshot = try await userCollection
+            .whereField("username_lowercase", isGreaterThanOrEqualTo: lowercasedQuery)
+            .whereField("username_lowercase", isLessThanOrEqualTo: endQuery)
+            .limit(to: limit)
+            .getDocuments()
+        
+        return snapshot.documents.compactMap { doc in
+            try? doc.data(as: UserData.self)
+        }
+    }
+
+    
     func updateFollowerCount(userId: String, increment: Int) async throws {
         let userRef = userCollection.document(userId)
         try await userRef.updateData([
@@ -123,7 +145,6 @@ final class UserManager {
         ])
     }
     
-    // Update following count (typically called by FollowService)
     func updateFollowingCount(userId: String, increment: Int) async throws {
         let userRef = userCollection.document(userId)
         try await userRef.updateData([
@@ -139,8 +160,8 @@ final class UserManager {
             
             return !snapshot.documents.isEmpty
         } catch {
-            if let nsError = error as? NSError, 
-               nsError.domain == "FIRFirestoreErrorDomain" && 
+            if let nsError = error as? NSError,
+               nsError.domain == "FIRFirestoreErrorDomain" &&
                nsError.code == 7 {
                 return false
             }
@@ -148,4 +169,4 @@ final class UserManager {
             throw error
         }
     }
-} 
+}
