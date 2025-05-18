@@ -9,6 +9,7 @@ struct WatchlistView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showSignInView = false
+    @State private var isOfflineMode = false
     
     var body: some View {
         NavigationView {
@@ -33,7 +34,7 @@ struct WatchlistView: View {
                 } else if isLoading {
                     ProgressView("Loading watchlist...")
                         .scaleEffect(1.2)
-                } else if let error = errorMessage {
+                } else if let error = errorMessage, watchlistItems.isEmpty {
                     VStack(spacing: 20) {
                         Text("Error loading watchlist")
                             .font(.headline)
@@ -81,16 +82,39 @@ struct WatchlistView: View {
                     }
                     .padding()
                 } else {
-                    List {
-                        ForEach(watchlistItems) { item in
-                            NavigationLink {
-                                // Use the show directly instead of conditional unwrapping
-                                FirestoreShowDetailView(firestoreShow: item.show)
-                            } label: {
-                                WatchlistItemRow(item: item)
+                    VStack {
+                        if isOfflineMode {
+                            HStack {
+                                Image(systemName: "wifi.slash")
+                                    .foregroundColor(.orange)
+                                Text("Offline Mode")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                                Spacer()
+                                Button(action: {
+                                    Task {
+                                        await loadWatchlist(forceRefresh: true)
+                                    }
+                                }) {
+                                    Image(systemName: "arrow.clockwise")
+                                        .foregroundColor(.blue)
+                                }
                             }
+                            .padding(.horizontal)
+                            .padding(.vertical, 6)
+                            .background(Color.orange.opacity(0.1))
                         }
-                        .onDelete(perform: removeFromWatchlist)
+                        
+                        List {
+                            ForEach(watchlistItems) { item in
+                                NavigationLink {
+                                    FirestoreShowDetailView(firestoreShow: item.show)
+                                } label: {
+                                    WatchlistItemRow(item: item)
+                                }
+                            }
+                            .onDelete(perform: removeFromWatchlist)
+                        }
                     }
                 }
             }
@@ -98,7 +122,16 @@ struct WatchlistView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if !watchlistItems.isEmpty && authManager.isSignedIn {
-                        EditButton()
+                        HStack {
+                            Button(action: {
+                                Task {
+                                    await loadWatchlist(forceRefresh: true)
+                                }
+                            }) {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                            EditButton()
+                        }
                     }
                 }
             }
@@ -115,28 +148,100 @@ struct WatchlistView: View {
         }
     }
     
-    private func loadWatchlist() async {
-        isLoading = true
-        errorMessage = nil
+    private func loadWatchlist(forceRefresh: Bool = false) async {
+        // Set loading state
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+        }
         
         if !authManager.isSignedIn {
-            isLoading = false
+            await MainActor.run {
+                isLoading = false
+            }
             return
         }
         
         guard let userId = authManager.currentUser?.uid else {
-            isLoading = false
+            await MainActor.run {
+                isLoading = false
+            }
             return
         }
         
         do {
-            watchlistItems = try await WatchlistService.shared.getWatchlist(userId: userId)
+            if forceRefresh {
+                // Only clear cache if we can refresh from server
+                await MainActor.run {
+                    print("WatchlistView: Force refreshing watchlist data")
+                }
+            }
+            
+            let items = try await WatchlistService.shared.getWatchlist(userId: userId)
+            
+            // Update UI on the main thread
+            await MainActor.run {
+                print("WatchlistView: Got \(items.count) watchlist items")
+                
+                if items.isEmpty && !forceRefresh {
+                    // If returning empty while not force refreshing, this could be due to
+                    // corrupt cache or no previous data, so keep any existing items
+                    if !watchlistItems.isEmpty {
+                        print("WatchlistView: Keeping existing \(watchlistItems.count) items instead of empty result")
+                        // Keep existing items
+                        isOfflineMode = true
+                    } else {
+                        // Otherwise use the empty result
+                        watchlistItems = items
+                        isOfflineMode = !items.isEmpty
+                    }
+                } else {
+                    // Normal case: use the items we got
+                    watchlistItems = items
+                    isOfflineMode = false
+                    
+                    // If we got items, enforce caching to make sure they're available offline
+                    if !items.isEmpty {
+                        WatchlistService.shared.forceCacheWatchlist(userId: userId, items: items)
+                    }
+                }
+                
+                isLoading = false // Make sure to set loading to false
+            }
         } catch {
-            errorMessage = error.localizedDescription
-            print("Error loading watchlist: \(error)")
+            print("WatchlistView: Error loading watchlist: \(error.localizedDescription)")
+            
+            // Try to get cached data directly
+            let cachedItems = await getCachedWatchlistItems(userId: userId)
+            
+            // Update UI on the main thread
+            await MainActor.run {
+                if !cachedItems.isEmpty {
+                    print("WatchlistView: Using \(cachedItems.count) cached items after error")
+                    watchlistItems = cachedItems
+                    isOfflineMode = true
+                    errorMessage = nil
+                } else if !watchlistItems.isEmpty {
+                    // Keep any existing items instead of showing empty
+                    print("WatchlistView: Keeping existing items after error")
+                    isOfflineMode = true
+                    errorMessage = nil
+                } else {
+                    // If no cached or existing items, show error
+                    errorMessage = "Unable to load your watchlist. Please check your internet connection and try again."
+                }
+                
+                isLoading = false
+            }
         }
-        
-        isLoading = false
+    }
+    
+    // Helper method to directly access cached watchlist items
+    private func getCachedWatchlistItems(userId: String) async -> [WatchlistItem] {
+        if let cachedItems = await WatchlistService.shared.loadCachedWatchlist(userId: userId) {
+            return cachedItems
+        }
+        return []
     }
     
     private func removeFromWatchlist(at offsets: IndexSet) {
@@ -161,8 +266,10 @@ struct WatchlistView: View {
                     try await WatchlistService.shared.removeFromWatchlist(userId: userId, showId: showId)
                 } catch {
                     print("Error removing show from watchlist: \(error)")
-                    // Consider re-adding the item to UI if backend removal fails
-                    // This would require more complex state management
+                    // If removal fails, show offline message
+                    await MainActor.run {
+                        isOfflineMode = true
+                    }
                 }
             }
         }
@@ -255,3 +362,4 @@ struct WatchlistItemRow: View {
     WatchlistView()
         .environmentObject(AuthManager())
 } 
+

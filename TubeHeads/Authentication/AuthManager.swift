@@ -48,6 +48,12 @@ class AuthManager: ObservableObject {
                         self?.currentUser = cachedUser
                         self?.isSignedIn = true
                         self?.isEmailVerified = user.isEmailVerified
+                        
+                        // Pre-cache watchlist data for offline use - do this immediately for reliable offline access
+                        Task.detached(priority: .userInitiated) {
+                            print("AuthManager: Pre-caching watchlist data for offline use")
+                            WatchlistService.shared.preCacheWatchlist(userId: user.uid)
+                        }
                     }
                 }
             } else {
@@ -120,6 +126,12 @@ class AuthManager: ObservableObject {
                 self.currentUser = cachedUser
                 self.isSignedIn = true
                 
+                // Pre-cache the watchlist for offline use - use Task.detached for immediate execution
+                Task.detached(priority: .userInitiated) {
+                    print("AuthManager: Pre-caching watchlist data after sign in")
+                    WatchlistService.shared.preCacheWatchlist(userId: authResult.uid)
+                }
+                
                 // Reload user to update verification status
                 Task {
                     do {
@@ -153,6 +165,9 @@ class AuthManager: ObservableObject {
     }
     
     func signOut() {
+        // Capture userId before sign out for cache cleanup
+        let userId = currentUser?.uid
+        
         do {
             try AuthenticationManager.shared.SignOut()
             DispatchQueue.main.async {
@@ -161,6 +176,11 @@ class AuthManager: ObservableObject {
                 self.isEmailVerified = false
             }
             UserDefaults.standard.removeObject(forKey: userDefaultsKey)
+            
+            // Clear watchlist cache if we had a user
+            if let userId = userId {
+                WatchlistService.shared.clearCache(for: userId)
+            }
         } catch {
             print("AuthManager: Sign out error: \(error.localizedDescription)")
         }
