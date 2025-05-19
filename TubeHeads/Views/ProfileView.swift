@@ -798,23 +798,23 @@ struct ProfileView: View {
     
     private func loadUserLists() {
         guard let userId = authManager.currentUser?.uid else { 
-            print("📋 Lists: No user ID available")
+            print("Lists: No user ID available")
             return 
         }
         
-        print("📋 Lists: Loading lists for user \(userId)")
+        print("Lists: Loading lists for user \(userId)")
         isLoadingLists = true
         
         Task {
             do {
                 // Get all user lists first (simpler query)
-                print("📋 Lists: Querying Firestore for all lists")
+                print("Lists: Querying Firestore for all lists")
                 let allListsSnapshot = try await Firestore.firestore().collection("lists")
                     .whereField("userId", isEqualTo: userId)
                     .order(by: "dateCreated", descending: true) // Sort by creation date
                     .getDocuments()
                 
-                print("📋 Lists: Found \(allListsSnapshot.documents.count) total lists")
+                print("Lists: Found \(allListsSnapshot.documents.count) total lists")
                 
                 // Filter for public lists client-side to avoid compound query issues
                 let publicListDocuments = allListsSnapshot.documents.filter { document in
@@ -824,12 +824,12 @@ struct ProfileView: View {
                     return false // If can't determine, exclude
                 }
                 
-                print("📋 Lists: Found \(publicListDocuments.count) public lists after filtering")
+                print("Lists: Found \(publicListDocuments.count) public lists after filtering")
                 
                 let lists = publicListDocuments.compactMap { document -> (id: String, name: String, description: String, isPrivate: Bool, userId: String, showIds: [String])? in
                     guard let data = document.data() as? [String: Any],
                           let name = data["name"] as? String else {
-                        print("📋 Lists: Error parsing document \(document.documentID) - missing required fields")
+                        print("Lists: Error parsing document \(document.documentID) - missing required fields")
                         return nil
                     }
                     
@@ -839,7 +839,7 @@ struct ProfileView: View {
                     let isPrivate = data["isPrivate"] as? Bool ?? false
                     let showIds = data["showIds"] as? [String] ?? []
                     
-                    print("📋 Lists: Parsed list: \(name), isPrivate: \(isPrivate), showIds: \(showIds.count)")
+                    print("Lists: Parsed list: \(name), isPrivate: \(isPrivate), showIds: \(showIds.count)")
                     
                     return (
                         id: document.documentID,
@@ -852,12 +852,12 @@ struct ProfileView: View {
                 }
                 
                 await MainActor.run {
-                    print("📋 Lists: Final count: \(lists.count) public lists")
+                    print("Lists: Final count: \(lists.count) public lists")
                     userLists = lists
                     isLoadingLists = false
                 }
             } catch {
-                print("📋 Lists: Error loading user lists: \(error)")
+                print("Lists: Error loading user lists: \(error)")
                 await MainActor.run {
                     isLoadingLists = false
                 }

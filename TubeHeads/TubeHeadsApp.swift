@@ -1,8 +1,3 @@
-//
-//  TubeHeadsApp.swift
-//  TubeHeads
-//
-
 import SwiftUI
 import SwiftData
 import FirebaseCore
@@ -48,7 +43,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         FirebaseApp.configure()
         print("Firebase Configured!")
         
-        // ✅ Enable Firestore offline persistence
+        // Enable Firestore offline persistence
         let settings = FirestoreSettings()
         settings.isPersistenceEnabled = true
         Firestore.firestore().settings = settings

@@ -212,7 +212,7 @@ struct ShowDetailView: View {
         errorMessage = nil
         
         do {
-            // First, check if the show exists in Firestore
+            // Check if the show exists in Firestore
             if let show = try await FirestoreShowService.shared.getShowByTMDBId(tmdbId: tmdbId) {
                 firestoreShow = show
                 
