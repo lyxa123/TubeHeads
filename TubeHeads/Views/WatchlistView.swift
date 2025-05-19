@@ -25,7 +25,7 @@ struct WatchlistView: View {
                             Text("Sign In")
                                 .frame(minWidth: 200)
                                 .padding()
-                                .background(Color.blue)
+                                .background(Color(hex:"77b1d4"))
                                 .foregroundColor(.white)
                                 .cornerRadius(8)
                         }
@@ -50,7 +50,7 @@ struct WatchlistView: View {
                         }) {
                             Text("Try Again")
                                 .padding()
-                                .background(Color.blue)
+                                .background(Color(hex:"77b1d4"))
                                 .foregroundColor(.white)
                                 .cornerRadius(8)
                         }
@@ -74,7 +74,7 @@ struct WatchlistView: View {
                         NavigationLink(destination: TrendingTVView()) {
                             Text("Discover Shows")
                                 .padding()
-                                .background(Color.blue)
+                                .background(Color(hex:"57b9ff"))
                                 .foregroundColor(.white)
                                 .cornerRadius(8)
                         }
@@ -129,8 +129,12 @@ struct WatchlistView: View {
                                 }
                             }) {
                                 Image(systemName: "arrow.clockwise")
+                                    .foregroundColor(.primary)
+                                Text("Reload")
+                                    .foregroundColor(.primary)
                             }
                             EditButton()
+                                .foregroundColor(Color(hex: "57b9ff"))
                         }
                     }
                 }
@@ -338,7 +342,7 @@ struct WatchlistItemRow: View {
             if item.show.averageUserRating > 0 {
                 HStack(spacing: 4) {
                     Image(systemName: "star.fill")
-                        .foregroundColor(.yellow)
+                        .foregroundColor(Color(hex:"57b9ff"))
                         .font(.caption)
                     
                     Text(String(format: "%.1f", item.show.averageUserRating))

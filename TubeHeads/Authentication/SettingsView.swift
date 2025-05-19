@@ -83,6 +83,7 @@ struct SettingsView: View {
                         }
                     }
                 }
+                .foregroundColor(Color(hex:"517891"))
                 
                 Button("Reset Password") {
                     Task {
@@ -94,8 +95,8 @@ struct SettingsView: View {
                             print(error)
                         }
                     }
-                    
                 }
+                .foregroundColor(.primary)
                 
                 Button("Update Password") {
                     Task {
@@ -107,8 +108,8 @@ struct SettingsView: View {
                             print(error)
                         }
                     }
-                    
                 }
+                .foregroundColor(.primary)
                 
                 Button("Update Email") {
                     Task {
@@ -120,8 +121,8 @@ struct SettingsView: View {
                             print(error)
                         }
                     }
-                    
                 }
+                .foregroundColor(.primary)
             }
         }
         .navigationBarTitle("Settings")
