@@ -83,41 +83,41 @@ struct UserReviewsView: View {
             }
             .navigationTitle("My Reviews")
             .task {
-                print("📱 UserReviewsView is loading user reviews")
+                print("UserReviewsView is loading user reviews")
                 await loadUserReviews()
             }
             .refreshable {
-                print("📱 UserReviewsView is refreshing user reviews")
+                print("UserReviewsView is refreshing user reviews")
                 await loadUserReviews()
             }
             .onAppear {
-                print("📱 UserReviewsView appeared")
+                print("UserReviewsView appeared")
             }
         }
     }
     
     private func loadUserReviews() async {
         guard let userId = authManager.currentUser?.uid else {
-            print("📱 UserReviewsView: No user signed in")
+            print("UserReviewsView: No user signed in")
             errorMessage = "Please sign in to view your reviews"
             return
         }
         
-        print("📱 UserReviewsView: Loading reviews for user \(userId)")
+        print("UserReviewsView: Loading reviews for user \(userId)")
         isLoading = true
         errorMessage = nil
         
         do {
-            print("📱 UserReviewsView: Calling getReviewsByUser")
+            print("UserReviewsView: Calling getReviewsByUser")
             reviews = try await FirestoreReviewService.shared.getReviewsByUser(userId: userId)
-            print("📱 UserReviewsView: Found \(reviews.count) reviews")
+            print("UserReviewsView: Found \(reviews.count) reviews")
             
             // Load show details for each review
             for review in reviews {
                 if showDetails[review.showId] == nil {
-                    print("📱 UserReviewsView: Loading details for show \(review.showId)")
+                    print("UserReviewsView: Loading details for show \(review.showId)")
                     if let show = try? await FirestoreShowService.shared.getShow(id: review.showId) {
-                        print("📱 UserReviewsView: Loaded show details for \(show.name)")
+                        print("UserReviewsView: Loaded show details for \(show.name)")
                         await MainActor.run {
                             showDetails[review.showId] = show
                         }

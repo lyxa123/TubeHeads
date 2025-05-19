@@ -1,7 +1,6 @@
 import SwiftUI
 import FirebaseFirestore
 
-// First add a model to track user stats
 struct UserProfileData {
     var username: String = "User"
     var bio: String = "No bio yet"

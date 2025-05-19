@@ -218,7 +218,6 @@ struct FirestoreShowDetailView: View {
                                     }
                                     
                                     // Even if we still don't have an ID, we can continue
-                                    // as the RatingView will handle creating the show
                                     showRateSheet = true
                                 }
                             }) {

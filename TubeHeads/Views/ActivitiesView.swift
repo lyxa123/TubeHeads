@@ -107,7 +107,7 @@ struct ActivitiesView: View {
         
         Task {
             do {
-                // 1. Get list of users the current user is following
+                // Get list of users the current user is following
                 let followingUsers = try await FollowService.shared.getFollowing(userId: currentUserId)
                 following = followingUsers.map { $0.id }
                 
@@ -120,7 +120,7 @@ struct ActivitiesView: View {
                     return
                 }
                 
-                // 2. Get recent reviews from followed users
+                // Get recent reviews from followed users
                 var activityItems: [ActivityItem] = []
                 
                 for userId in following {

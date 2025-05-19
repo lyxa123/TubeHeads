@@ -114,25 +114,25 @@ class FirestoreReviewService {
     
     // Get all reviews for a show
     func getReviewsForShow(showId: String) async throws -> [ShowReview] {
-        print("🔍 Fetching reviews for show ID: \(showId)")
+        print("Fetching reviews for show ID: \(showId)")
         
         let snapshot = try await reviewsCollection
             .whereField("showId", isEqualTo: showId)
             .order(by: "timestamp", descending: true)
             .getDocuments()
         
-        print("🔍 Found \(snapshot.documents.count) reviews")
+        print("Found \(snapshot.documents.count) reviews")
         
         let reviews = snapshot.documents.compactMap { document in
             do {
                 let review = try document.data(as: ShowReview.self)
-                print("🔍 Review from \(review.username ?? "unknown"): has profileImage? \(review.userProfileImageURL != nil)")
+                print("Review from \(review.username ?? "unknown"): has profileImage? \(review.userProfileImageURL != nil)")
                 if let profileImageData = review.userProfileImageURL {
-                    print("🔍   Profile image data length: \(profileImageData.count)")
+                    print("Profile image data length: \(profileImageData.count)")
                 }
                 return review
             } catch {
-                print("🔍 Error decoding review: \(error)")
+                print("Error decoding review: \(error)")
                 return nil
             }
         }
@@ -142,14 +142,14 @@ class FirestoreReviewService {
     
     // Get all reviews by a specific user
     func getReviewsByUser(userId: String) async throws -> [ShowReview] {
-        print("🔍 Fetching reviews for user ID: \(userId)")
+        print("Fetching reviews for user ID: \(userId)")
         
         let snapshot = try await reviewsCollection
             .whereField("userId", isEqualTo: userId)
             .order(by: "timestamp", descending: true)
             .getDocuments()
         
-        print("🔍 Found \(snapshot.documents.count) reviews by user")
+        print("Found \(snapshot.documents.count) reviews by user")
         
         let reviews = snapshot.documents.compactMap { document in
             do {
