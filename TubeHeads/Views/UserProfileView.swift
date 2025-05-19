@@ -40,7 +40,7 @@ struct UserProfileView: View {
                     if !isPublic {
                         Image(systemName: "lock.fill")
                             .font(.caption)
-                            .foregroundColor(.red)
+                            .foregroundColor(.primary)
                     }
                     
                     Spacer()
