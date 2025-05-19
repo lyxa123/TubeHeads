@@ -607,7 +607,7 @@ struct FollowButton: View {
             }
             .padding(.vertical, 6)
             .padding(.horizontal, 12)
-            .background(isFollowing ? Color.gray.opacity(0.2) : Color.blue.opacity(0.8))
+            .background(isFollowing ? Color.gray.opacity(0.2) : Color(hex:"77b1d4"))
             .foregroundColor(isFollowing ? .primary : .white)
             .cornerRadius(15)
         }
