@@ -57,7 +57,7 @@ struct UserReviewsView: View {
                                     Text("Sign In")
                                         .padding(.horizontal, 20)
                                         .padding(.vertical, 10)
-                                        .background(Color.blue)
+                                        .background(Color(hex: "#77b1d4"))
                                         .foregroundColor(.white)
                                         .cornerRadius(8)
                                 }
@@ -169,7 +169,7 @@ struct SimpleReviewCard: View {
                 HStack {
                     ForEach(1...5, id: \.self) { index in
                         Image(systemName: index <= Int(review.rating) ? "star.fill" : "star")
-                            .foregroundColor(.yellow)
+                            .foregroundColor(Color(hex: "#57b9ff"))
                             .font(.caption)
                     }
                 }

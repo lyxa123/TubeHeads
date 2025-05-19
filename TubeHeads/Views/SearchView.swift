@@ -178,7 +178,7 @@ struct SearchView: View {
                 Button("Clear") {
                     viewModel.clearRecentSearches()
                 }
-                .foregroundColor(.blue)
+                .foregroundColor(Color(hex:"517891"))
             }
             .padding(.horizontal)
             .padding(.top, 16)
@@ -229,7 +229,7 @@ struct SearchView: View {
             Spacer()
             Image(systemName: "exclamationmark.triangle")
                 .font(.largeTitle)
-                .foregroundColor(.yellow)
+                .foregroundColor(Color(hex:"57b9ff"))
                 .padding()
             
             Text("Error")
@@ -245,7 +245,7 @@ struct SearchView: View {
                 viewModel.search()
             }
             .padding()
-            .background(Color.blue)
+            .background(Color(hex:"77b1d4"))
             .foregroundColor(.white)
             .cornerRadius(8)
             

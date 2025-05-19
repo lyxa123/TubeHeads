@@ -69,7 +69,7 @@ struct ShowDetailView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(isInWatchlist ? Color.green.opacity(0.8) : Color.blue)
+                            .background(isInWatchlist ? Color(hex:"57b9ff") : Color.primary)
                             .foregroundColor(.white)
                             .cornerRadius(8)
                             .overlay(
@@ -110,7 +110,7 @@ struct ShowDetailView: View {
                                         .foregroundColor(.gray)
                                 } else {
                                     Image(systemName: "star.fill")
-                                        .foregroundColor(.yellow)
+                                        .foregroundColor(Color(hex:"57b9ff"))
                                     Text(String(format: "%.1f", show.averageUserRating))
                                         .fontWeight(.bold)
                                     Text("(\(show.userRatings.count) ratings)")
@@ -130,7 +130,7 @@ struct ShowDetailView: View {
                             HStack {
                                 ForEach(1...5, id: \.self) { star in
                                     Image(systemName: star <= Int(userRating) ? "star.fill" : "star")
-                                        .foregroundColor(.yellow)
+                                        .foregroundColor(Color(hex:"57b9ff"))
                                         .onTapGesture {
                                             // If tapping the same star that's already selected, clear the rating
                                             if Double(star) == userRating {
@@ -149,7 +149,7 @@ struct ShowDetailView: View {
                                 Text("Sign in to rate")
                                     .padding(.vertical, 8)
                                     .padding(.horizontal, 16)
-                                    .background(Color.blue)
+                                    .background(Color(hex:"77b1d4"))
                                     .foregroundColor(.white)
                                     .cornerRadius(8)
                             }

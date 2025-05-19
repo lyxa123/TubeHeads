@@ -133,7 +133,7 @@ struct SignInView: View {
                         .foregroundColor(.white)
                         .padding(.vertical, 12)
                         .padding(.horizontal, 20)
-                        .background(Color.blue)
+                        .background(Color(hex:"77b1d4"))
                         .cornerRadius(10)
                     }
                     .disabled(isLoading)

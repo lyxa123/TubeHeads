@@ -108,6 +108,7 @@ struct SettingsView: View {
                         }
                     }
                 }
+                .foregroundColor(Color(hex:"517891"))
                 
                 Button("Reset Password") {
                     Task {
@@ -123,6 +124,7 @@ struct SettingsView: View {
                 } message: {
                     Text("Check your email for instructions to reset your password.")
                 }
+                .foregroundColor(.primary)
                 
                 Button("Update Password") {
                     showUpdatePasswordSheet = true
@@ -194,12 +196,14 @@ struct SettingsView: View {
                         .navigationTitle("Update Password")
                         .navigationBarTitleDisplayMode(.inline)
                     }
+
                 }
                 .alert("Password Updated", isPresented: $viewModel.showPasswordUpdateAlert) {
                     Button("OK", role: .cancel) { }
                 } message: {
                     Text("Your password has been successfully updated.")
                 }
+                .foregroundColor(.primary)
             }
         }
         .navigationBarTitle("Settings")

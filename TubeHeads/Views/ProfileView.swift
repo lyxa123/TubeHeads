@@ -361,7 +361,7 @@ struct ProfileView: View {
                             .foregroundColor(.white)
                             .padding()
                             .frame(maxWidth: .infinity)
-                            .background(Color.blue)
+                            .background(Color(hex: "77b1d4"))
                             .cornerRadius(10)
                     }
                 }
@@ -429,6 +429,8 @@ struct ProfileView: View {
                     Button(action: {
                         showEditProfile = true
                     }) {
+                        Text("Edit Profile")
+                            .foregroundColor(.primary)
                         Image(systemName: "pencil")
                             .font(.title3)
                             .foregroundColor(.primary)
@@ -446,7 +448,7 @@ struct ProfileView: View {
                     // Show appropriate icon based on privacy status
                     Image(systemName: isPublic ? "lock.open.fill" : "lock.fill")
                         .font(.caption)
-                        .foregroundColor(isPublic ? .green : .red)
+                        .foregroundColor(isPublic ? .gray : .primary)
                 }
                 .padding(.horizontal)
                 
@@ -473,7 +475,7 @@ struct ProfileView: View {
                     HStack {
                         Image(systemName: "mappin.and.ellipse")
                             .font(.caption)
-                            .foregroundColor(.red)
+                            .foregroundColor(Color(hex: "77b1d4"))
                         Text(location)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
@@ -565,7 +567,7 @@ struct ProfileView: View {
                             NavigationLink(destination: WatchedShowsView(shows: watchedShows)) {
                                 Text("See All")
                                     .font(.subheadline)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(Color(hex: "#57b9ff"))
                             }
                         }
                     }
@@ -608,7 +610,7 @@ struct ProfileView: View {
                         NavigationLink(destination: UserListsView()) {
                             Text("See All")
                                 .font(.subheadline)
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color(hex: "#57b9ff"))
                         }
                     }
                     .padding(.horizontal)
@@ -921,7 +923,7 @@ struct EditProfileView: View {
                     PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                         Text("Change Photo")
                             .font(.subheadline)
-                            .foregroundColor(.blue)
+                            .foregroundColor(Color(hex: "#77b1d4"))
                     }
                     .padding(.top, 8)
                     
@@ -1005,7 +1007,7 @@ struct EditProfileView: View {
                             }) {
                                 Image(systemName: "location.fill")
                                     .font(.system(size: 18))
-                                    .foregroundColor(.blue)
+                                    .foregroundStyle(Color(hex: "#57b9ff"))
                                     .padding(12)
                                     .background(Color(.systemGray6))
                                     .cornerRadius(8)
@@ -1023,12 +1025,13 @@ struct EditProfileView: View {
                             Toggle(isOn: $isPublic) {
                                 HStack {
                                     Image(systemName: isPublic ? "lock.open.fill" : "lock.fill")
-                                        .foregroundColor(isPublic ? .green : .red)
+                                        .foregroundColor(isPublic ? .gray : .primary)
                                     
                                     Text(isPublic ? "Public Profile" : "Private Profile")
                                         .font(.subheadline)
                                 }
                             }
+                            .tint(Color(hex: "57b9ff"))
                             .padding()
                             .background(Color(.systemGray6))
                             .cornerRadius(8)
@@ -1050,6 +1053,7 @@ struct EditProfileView: View {
                 Button("Cancel") {
                     dismiss()
                 }
+                .foregroundColor(.gray)
             }
             
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -1057,6 +1061,7 @@ struct EditProfileView: View {
                     saveProfile()
                 }
                 .disabled(isSaving)
+                .foregroundColor(Color(hex: "#57b9ff"))
             }
         }
         .onChange(of: selectedPhotoItem) { newItem in
@@ -1095,7 +1100,7 @@ struct EditProfileView: View {
                                 
                                 if location == country {
                                     Image(systemName: "checkmark")
-                                        .foregroundColor(.blue)
+                                        .foregroundStyle(Color(hex: "#57b9ff"))
                                 }
                             }
                         }
@@ -1109,6 +1114,7 @@ struct EditProfileView: View {
                         Button("Done") {
                             showCountryPicker = false
                         }
+                        .foregroundColor(Color(hex: "#57b9ff"))
                     }
                 }
             }
@@ -1233,7 +1239,7 @@ struct WatchedShowRow: View {
                             ForEach(1...5, id: \.self) { star in
                                 Image(systemName: star <= rating ? "star.fill" : "star")
                                     .font(.system(size: 10))
-                                    .foregroundColor(star <= rating ? .yellow : .gray.opacity(0.5))
+                                    .foregroundColor(star <= rating ? Color(hex:"57b9ff") : .gray.opacity(0.5))
                             }
                         }
                     }
@@ -1295,7 +1301,7 @@ struct FirestoreShowDetailViewWrapper: View {
                         }
                     }
                     .padding()
-                    .background(Color.blue)
+                    .background(Color(hex: "77b1d4"))
                     .foregroundColor(.white)
                     .cornerRadius(8)
                 }
@@ -1380,7 +1386,7 @@ struct FirestoreShowDetailViewNavigator: View {
                         }
                     }
                     .padding()
-                    .background(Color.blue)
+                    .background(Color(hex: "77b1d4"))
                     .foregroundColor(.white)
                     .cornerRadius(8)
                 }
@@ -1471,7 +1477,7 @@ struct WatchButton: View {
                         ForEach(1...5, id: \.self) { star in
                             Image(systemName: star <= rating ? "star.fill" : "star")
                                 .font(.system(size: 24))
-                                .foregroundColor(star <= rating ? .yellow : .gray)
+                                .foregroundColor(star <= rating ? Color(hex:"57b9ff") : .gray)
                                 .onTapGesture {
                                     rating = star
                                     saveRating()
@@ -1859,7 +1865,7 @@ struct LikedListsView: View {
                         loadLikedLists()
                     }
                     .padding()
-                    .background(Color.blue)
+                    .background(Color(hex: "77b1d4"))
                     .foregroundColor(.white)
                     .cornerRadius(8)
                 }
@@ -1940,7 +1946,7 @@ struct LikedListRow: View {
                 
                 Image(systemName: "heart.fill")
                     .font(.system(size: 16))
-                    .foregroundColor(.red)
+                    .foregroundColor(Color(hex: "#77b1d4"))
             }
             
             VStack(alignment: .leading, spacing: 4) {
@@ -1963,8 +1969,8 @@ struct LikedListRow: View {
                 HStack {
                     Text("\(list.showIds.count) shows")
                         .font(.caption)
-                        .foregroundColor(.blue)
-                    
+                        .foregroundStyle(Color(hex: "#57b9ff"))
+
                     Text("•")
                         .font(.caption)
                         .foregroundColor(.gray)
