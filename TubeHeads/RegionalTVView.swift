@@ -7,9 +7,14 @@ struct RegionalTVView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Popular in \(viewModel.regionName)")
+                Text("Popular in")
                     .font(.headline)
                     .fontWeight(.bold)
+                
+                Text(viewModel.regionName)
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(Color(hex: "#57b9ff"))
                 
                 Spacer()
                 

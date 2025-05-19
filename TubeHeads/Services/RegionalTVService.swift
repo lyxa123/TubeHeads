@@ -67,16 +67,67 @@ class RegionalTVService {
         return "us" // Default to United States
     }
     
+    // Get language preferences based on region
+    private func getLanguagePreference(for region: String) -> String? {
+        // Map regions to their primary languages
+        let regionLanguageMap: [String: String] = [
+            "us": "en",     // United States - English
+            "gb": "en",     // United Kingdom - English
+            "ca": "en,fr",  // Canada - English and French
+            "au": "en",     // Australia - English
+            "in": "hi,en",  // India - Hindi and English
+            "jp": "ja",     // Japan - Japanese
+            "kr": "ko",     // South Korea - Korean
+            "br": "pt",     // Brazil - Portuguese
+            "fr": "fr",     // France - French
+            "de": "de",     // Germany - German
+            "es": "es",     // Spain - Spanish
+            "it": "it",     // Italy - Italian
+            "ru": "ru",     // Russia - Russian
+            "cn": "zh",     // China - Chinese
+            "ng": "en",     // Nigeria - English
+            "mx": "es"      // Mexico - Spanish
+        ]
+        
+        return regionLanguageMap[region]
+    }
+    
     // Fetch popular shows
     func fetchPopularShows(region: String) async throws -> [TVShow] {
-        // Use discover endpoint instead of popular for better region-specific results
-        let urlString = "https://api.themoviedb.org/3/discover/tv?api_key=\(apiKey)&sort_by=popularity.desc&region=\(region)&with_original_language=en&include_adult=false&vote_count.gte=100"
+        // Enhanced query with more region-specific parameters and cache-busting
+        var urlComponents = URLComponents(string: "https://api.themoviedb.org/3/discover/tv")!
         
-        guard let url = URL(string: urlString) else {
+        var queryItems = [
+            URLQueryItem(name: "api_key", value: apiKey),
+            URLQueryItem(name: "sort_by", value: "popularity.desc"),
+            URLQueryItem(name: "region", value: region),
+            URLQueryItem(name: "watch_region", value: region),
+            URLQueryItem(name: "include_adult", value: "false"),
+            URLQueryItem(name: "vote_count.gte", value: "10"),
+            URLQueryItem(name: "page", value: "1"),
+            // Cache busting parameter
+            URLQueryItem(name: "random", value: "\(Int.random(in: 1...1000000))")
+        ]
+        
+        // Add language preference if available for this region
+        if let languagePreference = getLanguagePreference(for: region) {
+            queryItems.append(URLQueryItem(name: "with_original_language", value: languagePreference))
+            print("Using language preference for \(region): \(languagePreference)")
+        }
+        
+        urlComponents.queryItems = queryItems
+        
+        guard let url = urlComponents.url else {
             throw URLError(.badURL)
         }
         
-        let (data, response) = try await URLSession.shared.data(from: url)
+        print("API URL: \(url.absoluteString)")
+        
+        var request = URLRequest(url: url)
+        // Disable caching
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw URLError(.badServerResponse)
@@ -90,13 +141,18 @@ class RegionalTVService {
     
     // Fetch providers for a specific show in a specific region
     func fetchWatchProviders(for showId: Int, region: String) async throws -> [Provider] {
-        let urlString = "https://api.themoviedb.org/3/tv/\(showId)/watch/providers?api_key=\(apiKey)"
+        // Add cache busting parameter
+        let urlString = "https://api.themoviedb.org/3/tv/\(showId)/watch/providers?api_key=\(apiKey)&random=\(Int.random(in: 1...1000000))"
         
         guard let url = URL(string: urlString) else {
             throw URLError(.badURL)
         }
         
-        let (data, response) = try await URLSession.shared.data(from: url)
+        var request = URLRequest(url: url)
+        // Disable caching
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw URLError(.badServerResponse)
@@ -128,7 +184,9 @@ class RegionalTVService {
     
     // Fetch popular shows with their streaming providers for a specific region
     func fetchRegionalShows(region: String) async throws -> [RegionalShow] {
+        print("Fetching shows for region: \(region)")
         let shows = try await fetchPopularShows(region: region)
+        print("Found \(shows.count) shows for region \(region)")
         
         var regionalShows: [RegionalShow] = []
         var showsWithoutProviders: [TVShow] = []
@@ -163,6 +221,7 @@ class RegionalTVService {
             }
         }
         
+        print("Returning \(regionalShows.count) regional shows for \(region)")
         return regionalShows
     }
 } 

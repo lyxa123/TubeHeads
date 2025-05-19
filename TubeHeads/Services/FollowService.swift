@@ -79,6 +79,19 @@ class FollowService {
             
             return nil
         }
+        
+        // Send notification to the user being followed
+        do {
+            let currentUserData = try await UserManager.shared.getUser(userId: currentUserId)
+            try await NotificationService.shared.sendFollowNotification(
+                fromUserId: currentUserId,
+                fromUsername: currentUserData.username,
+                toUserId: targetUserId
+            )
+        } catch {
+            // Log error but don't fail the follow action if notification fails
+            print("Error sending follow notification: \(error.localizedDescription)")
+        }
     }
     
     // Unfollow a user

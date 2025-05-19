@@ -6,6 +6,11 @@ final class SettingsViewModelInfo: ObservableObject {
     @Published var username: String = ""
     @Published var isLoading: Bool = false
     @Published var errorMessage: String = ""
+    @Published var showResetPasswordAlert: Bool = false
+    @Published var showPasswordUpdateAlert: Bool = false
+    @Published var newPassword: String = ""
+    @Published var confirmPassword: String = ""
+    @Published var showError: Bool = false
     
     func loadUserData() async {
         isLoading = true
@@ -30,18 +35,36 @@ final class SettingsViewModelInfo: ObservableObject {
         }
             
         try await AuthenticationManager.shared.resetPassword(email: email)
-    }
-    
-    func updateEmail() async throws {
-        let email = "hello@gmail.com"
-        
-        try await AuthenticationManager.shared.updateEmail(email: email)
+        showResetPasswordAlert = true
     }
     
     func updatePassword() async throws {
-        let password = "1234567890"
+        // Validate passwords
+        if newPassword.isEmpty || confirmPassword.isEmpty {
+            errorMessage = "Please fill in all fields."
+            showError = true
+            throw NSError(domain: "All fields are required", code: 400)
+        }
         
-        try await AuthenticationManager.shared.updatePassword(password: password)
+        if newPassword != confirmPassword {
+            errorMessage = "Passwords don't match."
+            showError = true
+            throw NSError(domain: "Passwords don't match", code: 400)
+        }
+        
+        if newPassword.count < 6 {
+            errorMessage = "Password must be at least 6 characters."
+            showError = true
+            throw NSError(domain: "Password must be at least 6 characters", code: 400)
+        }
+        
+        try await AuthenticationManager.shared.updatePassword(password: newPassword)
+        showPasswordUpdateAlert = true
+        
+        // Clear fields after successful update
+        newPassword = ""
+        confirmPassword = ""
+        showError = false
     }
 }
 
@@ -49,6 +72,8 @@ struct SettingsView: View {
     
     @StateObject private var viewModel = SettingsViewModelInfo()
     @Binding var showSignInView: Bool
+    @State private var showUpdatePasswordSheet: Bool = false
+    @State private var isUpdatingPassword: Bool = false
     
     var body: some View {
         List {
@@ -89,38 +114,94 @@ struct SettingsView: View {
                     Task {
                         do {
                             try await viewModel.resetPassword()
-                            print("PASSWORD RESET!")
-                            
                         } catch {
                             print(error)
                         }
                     }
+                }
+                .alert("Password Reset Email Sent", isPresented: $viewModel.showResetPasswordAlert) {
+                    Button("OK", role: .cancel) { }
+                } message: {
+                    Text("Check your email for instructions to reset your password.")
                 }
                 .foregroundColor(.primary)
                 
                 Button("Update Password") {
-                    Task {
-                        do {
-                            try await viewModel.updatePassword()
-                            print("Password Updated")
-                            
-                        } catch {
-                            print(error)
-                        }
-                    }
+                    showUpdatePasswordSheet = true
                 }
-                .foregroundColor(.primary)
-                
-                Button("Update Email") {
-                    Task {
-                        do {
-                            try await viewModel.updateEmail()
-                            print("Email Updated")
+                .sheet(isPresented: $showUpdatePasswordSheet) {
+                    NavigationStack {
+                        VStack(spacing: 20) {
+                            SecureField("New Password", text: $viewModel.newPassword)
+                                .padding()
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(10)
+                                
+                            SecureField("Confirm New Password", text: $viewModel.confirmPassword)
+                                .padding()
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(10)
+                                
+                            if viewModel.showError {
+                                Text(viewModel.errorMessage)
+                                    .foregroundColor(.red)
+                                    .padding(.vertical, 5)
+                            }
                             
-                        } catch {
-                            print(error)
+                            Button {
+                                Task {
+                                    isUpdatingPassword = true
+                                    do {
+                                        try await viewModel.updatePassword()
+                                        isUpdatingPassword = false
+                                        showUpdatePasswordSheet = false
+                                    } catch {
+                                        isUpdatingPassword = false
+                                        print(error)
+                                    }
+                                }
+                            } label: {
+                                Group {
+                                    if isUpdatingPassword {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                                    } else {
+                                        Text("Update Password")
+                                            .font(.headline)
+                                            .foregroundColor(.black)
+                                    }
+                                }
+                                .frame(height: 55)
+                                .frame(maxWidth: .infinity)
+                                .background(Color(hex: "#77b1d4"))
+                                .cornerRadius(10)
+                                .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 2)
+                            }
+                            .disabled(isUpdatingPassword)
+                            .padding(.top, 10)
+                            
+                            Spacer()
                         }
+                        .padding()
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Cancel") {
+                                    viewModel.newPassword = ""
+                                    viewModel.confirmPassword = ""
+                                    viewModel.showError = false
+                                    showUpdatePasswordSheet = false
+                                }
+                            }
+                        }
+                        .navigationTitle("Update Password")
+                        .navigationBarTitleDisplayMode(.inline)
                     }
+
+                }
+                .alert("Password Updated", isPresented: $viewModel.showPasswordUpdateAlert) {
+                    Button("OK", role: .cancel) { }
+                } message: {
+                    Text("Your password has been successfully updated.")
                 }
                 .foregroundColor(.primary)
             }

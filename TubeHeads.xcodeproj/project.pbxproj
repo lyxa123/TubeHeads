@@ -16,6 +16,7 @@
 		222AF4932DB8BBDF0016CBC2 /* FirebaseFirestoreSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 222AF4922DB8BBDF0016CBC2 /* FirebaseFirestoreSwift */; };
 		222AF4952DB8BBDF0016CBC2 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 222AF4942DB8BBDF0016CBC2 /* FirebaseStorage */; };
 		222AF4972DB8BBDF0016CBC2 /* FirebaseStorageCombine-Community in Frameworks */ = {isa = PBXBuildFile; productRef = 222AF4962DB8BBDF0016CBC2 /* FirebaseStorageCombine-Community */; };
+		22D2B0CD2DDAD90A007BE70E /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 22D2B0CC2DDAD90A007BE70E /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -56,6 +57,7 @@
 			files = (
 				222AF48D2DB8BBDF0016CBC2 /* FirebaseDatabaseSwift in Frameworks */,
 				222AF48B2DB8BBDF0016CBC2 /* FirebaseDatabase in Frameworks */,
+				22D2B0CD2DDAD90A007BE70E /* FirebaseMessaging in Frameworks */,
 				222AF4872DB8BBDF0016CBC2 /* FirebaseAuth in Frameworks */,
 				222AF4932DB8BBDF0016CBC2 /* FirebaseFirestoreSwift in Frameworks */,
 				222AF4912DB8BBDF0016CBC2 /* FirebaseFirestoreCombine-Community in Frameworks */,
@@ -138,6 +140,7 @@
 				222AF4922DB8BBDF0016CBC2 /* FirebaseFirestoreSwift */,
 				222AF4942DB8BBDF0016CBC2 /* FirebaseStorage */,
 				222AF4962DB8BBDF0016CBC2 /* FirebaseStorageCombine-Community */,
+				22D2B0CC2DDAD90A007BE70E /* FirebaseMessaging */,
 			);
 			productName = TubeHeads;
 			productReference = 2233735D2D8B82140020B861 /* TubeHeads.app */;
@@ -648,6 +651,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 222AF4852DB8BBDF0016CBC2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = "FirebaseStorageCombine-Community";
+		};
+		22D2B0CC2DDAD90A007BE70E /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 222AF4852DB8BBDF0016CBC2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
