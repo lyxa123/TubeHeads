@@ -1247,7 +1247,7 @@ struct ShowGridItemView: View {
                 .font(.subheadline)
                 .fontWeight(.medium)
                 .lineLimit(1)
-                .foregroundColor(.black)
+                .foregroundColor(.primary)
 
             // Release year
             Text(show.releaseYear)
