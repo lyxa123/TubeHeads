@@ -95,7 +95,7 @@ struct UserProfileView: View {
                             HStack {
                                 Image(systemName: "mappin.and.ellipse")
                                     .font(.caption)
-                                    .foregroundColor(.red)
+                                    .foregroundColor(Color(hex: "77b1d4"))
                                 Text(user.location)
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
@@ -169,7 +169,7 @@ struct UserProfileView: View {
                                     NavigationLink(destination: WatchedShowsView(shows: watchedShows)) {
                                         Text("See All")
                                             .font(.subheadline)
-                                            .foregroundColor(.blue)
+                                            .foregroundColor(Color(hex: "#57b9ff"))
                                     }
                                 }
                             }
@@ -359,12 +359,12 @@ struct ShowListRow: View {
             // List icon
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.blue.opacity(0.1))
+                    .fill(Color(hex:"57b9ff").opacity(0.1))
                     .frame(width: 45, height: 45)
                 
                 Image(systemName: "list.bullet")
                     .font(.system(size: 20))
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color(hex:"57b9ff"))
             }
             
             VStack(alignment: .leading, spacing: 4) {
@@ -386,7 +386,7 @@ struct ShowListRow: View {
                 // Show count
                 Text("\(list.showIds.count) shows")
                     .font(.caption)
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color(hex:"57b9ff"))
             }
             
             Spacer()
@@ -402,7 +402,7 @@ struct ShowListRow: View {
                                 .scaleEffect(0.7)
                         } else {
                             Image(systemName: isLiked ? "heart.fill" : "heart")
-                                .foregroundColor(isLiked ? .red : .gray)
+                                .foregroundColor(isLiked ? Color(hex: "#77b1d4") : .gray)
                                 .font(.system(size: 18))
                         }
                     }

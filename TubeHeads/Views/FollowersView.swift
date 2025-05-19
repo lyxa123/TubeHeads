@@ -223,7 +223,7 @@ struct UserFollowRow: View {
                         .fontWeight(.medium)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(isFollowing ? Color.gray.opacity(0.2) : Color.blue)
+                        .background(isFollowing ? Color.gray.opacity(0.2) : Color(hex: "77b1d4"))
                         .foregroundColor(isFollowing ? .primary : .white)
                         .cornerRadius(16)
                 }
@@ -412,7 +412,7 @@ struct SuggestedUserCard: View {
                     .fontWeight(.medium)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(isFollowing ? Color.gray.opacity(0.2) : Color.blue)
+                    .background(isFollowing ? Color.gray.opacity(0.2) : Color(hex: "77b1d4"))
                     .foregroundColor(isFollowing ? .primary : .white)
                     .cornerRadius(12)
             }

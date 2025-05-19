@@ -103,6 +103,7 @@ struct FirestoreShowDetailView: View {
                                         .font(.caption)
                                 }
                                 .frame(maxWidth: .infinity)
+                                .foregroundColor(Color(hex:"77b1d4"))
                             }
                             .disabled(isAddingToWatchlist || isLoading)
                         } else {
@@ -140,12 +141,13 @@ struct FirestoreShowDetailView: View {
                                             .progressViewStyle(CircularProgressViewStyle())
                                             .font(.system(size: 22))
                                     } else {
-                                        Image(systemName: isWatched ? "checkmark.circle.fill" : "circle")
+                                        Image(systemName: isWatched ? "eye.fill" : "eye")
                                             .font(.system(size: 22))
-                                            .foregroundColor(isWatched ? .green : nil)
+                                            .foregroundColor(isWatched ? Color(hex:"77b1d4") : Color(hex:"77b1d4"))
                                     }
                                     Text("Watched")
                                         .font(.caption)
+                                        .foregroundColor(Color(hex:"77b1d4"))
                                 }
                                 .frame(maxWidth: .infinity)
                             }
@@ -155,7 +157,7 @@ struct FirestoreShowDetailView: View {
                                 // Sign in prompt
                             }) {
                                 VStack {
-                                    Image(systemName: "circle")
+                                    Image(systemName: "eye")
                                         .font(.system(size: 22))
                                     Text("Watched")
                                         .font(.caption)
@@ -182,12 +184,13 @@ struct FirestoreShowDetailView: View {
                                 }
                             }) {
                                 VStack {
-                                    Image(systemName: "list.bullet")
+                                    Image(systemName: "book.pages")
                                         .font(.system(size: 22))
                                     Text("Add to List")
                                         .font(.caption)
                                 }
                                 .frame(maxWidth: .infinity)
+                                .foregroundColor(Color(hex:"77b1d4"))
                             }
                             .disabled(isLoading)
                         } else {
@@ -195,7 +198,7 @@ struct FirestoreShowDetailView: View {
                                 // Sign in prompt
                             }) {
                                 VStack {
-                                    Image(systemName: "list.bullet")
+                                    Image(systemName: "book.pages")
                                         .font(.system(size: 22))
                                     Text("Add to List")
                                         .font(.caption)
@@ -222,9 +225,10 @@ struct FirestoreShowDetailView: View {
                                 VStack {
                                     Image(systemName: userRating != nil ? "star.fill" : "star")
                                         .font(.system(size: 22))
-                                        .foregroundColor(userRating != nil ? .yellow : nil)
+                                        .foregroundColor(userRating != nil ? Color(hex:"77b1d4") : Color(hex:"77b1d4"))
                                     Text("Rate")
                                         .font(.caption)
+                                        .foregroundColor(Color(hex:"77b1d4"))
                                 }
                                 .frame(maxWidth: .infinity)
                             }
@@ -267,7 +271,7 @@ struct FirestoreShowDetailView: View {
                                     .foregroundColor(.gray)
                             } else {
                                 Image(systemName: "star.fill")
-                                    .foregroundColor(.yellow)
+                                    .foregroundColor(Color(hex:"57b9ff"))
                                 Text(String(format: "%.1f", firestoreShow.averageUserRating))
                                     .fontWeight(.bold)
                                 Text("(\(firestoreShow.userRatings.count) ratings)")
@@ -285,7 +289,7 @@ struct FirestoreShowDetailView: View {
                                     ForEach(1...5, id: \.self) { star in
                                         Image(systemName: Double(star) <= rating ? "star.fill" : "star")
                                             .font(.caption)
-                                            .foregroundColor(.yellow)
+                                            .foregroundColor(Color(hex:"57b9ff"))
                                     }
                                 }
                             }
@@ -643,10 +647,10 @@ struct AddToListView: View {
             .navigationBarItems(
                 leading: Button("Cancel") {
                     presentationMode.wrappedValue.dismiss()
-                },
+                }.foregroundColor(.gray),
                 trailing: Button("Done") {
                     presentationMode.wrappedValue.dismiss()
-                }
+                }.foregroundColor(Color(hex: "57b9ff"))
             )
             .task {
                 // Set loading state immediately
@@ -724,14 +728,14 @@ struct AddToListView: View {
             HStack {
                 Text("Your Lists")
                     .font(.headline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.primary)
                 
                 Spacer()
                 
                 if !selectedListIds.isEmpty {
                     Text("\(selectedListIds.count) selected")
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color(hex: "#77b1d4"))
                 }
             }
             .padding(.horizontal)
@@ -754,8 +758,8 @@ struct AddToListView: View {
                                         .font(.caption)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 2)
-                                        .background(Color.blue.opacity(0.2))
-                                        .foregroundColor(.blue)
+                                        .background(Color(hex: "#57b9ff").opacity(0.2))
+                                        .foregroundColor(Color(hex: "#77b1d4"))
                                         .cornerRadius(4)
                                 }
                             }
@@ -776,7 +780,7 @@ struct AddToListView: View {
                                 toggleList(list)
                             }) {
                                 Image(systemName: isInList ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(isInList ? .blue : .gray)
+                                    .foregroundColor(isInList ? Color(hex:"77b1d4") : .gray)
                                     .font(.system(size: 24))
                             }
                             .buttonStyle(PlainButtonStyle())
@@ -787,7 +791,7 @@ struct AddToListView: View {
                         toggleList(list)
                     }
                     .padding(.vertical, 4)
-                    .background(isInList ? Color.blue.opacity(0.05) : Color.clear)
+                    .background(isInList ? Color(hex: "#77b1d4").opacity(0.05) : Color.clear)
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                 }
                 .listRowSeparator(.visible)
@@ -993,7 +997,7 @@ struct RatingView: View {
                     ForEach(1...5, id: \.self) { star in
                         Image(systemName: star <= Int(rating) ? "star.fill" : "star")
                             .font(.system(size: 36))
-                            .foregroundColor(.yellow)
+                            .foregroundColor(Color(hex:"57b9ff"))
                             .onTapGesture {
                                 // If tapping the same star that's already selected, clear the rating
                                 if Double(star) == rating {
@@ -1034,7 +1038,7 @@ struct RatingView: View {
                             .foregroundColor(.white)
                             .padding()
                             .frame(maxWidth: .infinity)
-                            .background(Color.blue)
+                            .background(Color(hex:"77b1d4"))
                             .cornerRadius(10)
                     }
                 }
@@ -1047,6 +1051,7 @@ struct RatingView: View {
             .navigationBarItems(trailing: Button("Done") {
                 dismiss()
             })
+            .foregroundColor(Color(hex:"57b9ff"))
         }
     }
     

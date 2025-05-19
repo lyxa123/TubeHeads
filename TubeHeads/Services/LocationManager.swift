@@ -101,7 +101,7 @@ struct LocationPermissionView: View {
         VStack(spacing: 20) {
             Image(systemName: "location.circle.fill")
                 .font(.system(size: 60))
-                .foregroundColor(.blue)
+                .foregroundColor(Color(hex:"57b9ff"))
                 .padding()
             
             Text("Allow \"TubeHeads\" to access your location while you are using the app?")
@@ -130,7 +130,7 @@ struct LocationPermissionView: View {
                 }
                 .padding()
                 .frame(maxWidth: .infinity)
-                .background(Color.blue)
+                .background(Color(hex:"77b1d4"))
                 .foregroundColor(.white)
                 .cornerRadius(10)
             }

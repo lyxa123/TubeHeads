@@ -36,14 +36,15 @@ struct ReviewsView: View {
                         if userReview != nil {
                             Label("Edit Review", systemImage: "pencil")
                                 .font(.subheadline)
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color(hex:"77b1d4"))
                         } else {
                             HStack {
                                 Label("Write a Review", systemImage: "square.and.pencil")
                                     .font(.subheadline)
+                                    .foregroundColor(Color(hex:"77b1d4"))
                                 if userExistingRating != nil {
                                     Image(systemName: "star.fill")
-                                        .foregroundColor(.yellow)
+                                        .foregroundColor(Color(hex:"57b9ff"))
                                         .font(.caption)
                                 }
                             }
@@ -293,7 +294,7 @@ struct ReviewCard: View {
                 // Rating
                 HStack(spacing: 2) {
                     Image(systemName: "star.fill")
-                        .foregroundColor(.yellow)
+                        .foregroundColor(Color(hex:"57b9ff"))
                         .font(.caption)
                     
                     Text(String(format: "%.1f", review.rating))
@@ -328,7 +329,7 @@ struct ReviewCard: View {
                     Button(action: onLike) {
                         HStack(spacing: 4) {
                             Image(systemName: review.userLikes.contains(authManager.currentUser?.uid ?? "") ? "heart.fill" : "heart")
-                                .foregroundColor(review.userLikes.contains(authManager.currentUser?.uid ?? "") ? .red : .gray)
+                                .foregroundColor(review.userLikes.contains(authManager.currentUser?.uid ?? "") ? Color(hex: "#77b1d4") : .gray)
                             
                             if review.likes > 0 {
                                 Text("\(review.likes)")
@@ -402,7 +403,7 @@ struct AddReviewView: View {
                             ForEach(1...5, id: \.self) { star in
                                 let ratingValue = userExistingRating ?? rating
                                 Image(systemName: star <= Int(ratingValue) ? "star.fill" : "star")
-                                    .foregroundColor(.yellow)
+                                    .foregroundColor(Color(hex:"57b9ff"))
                                     .onTapGesture {
                                         if userExistingRating == nil {
                                             if Double(star) == rating {
@@ -455,10 +456,9 @@ struct AddReviewView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 10)
-                .background(Color.blue)
+                .background(Color(hex:"77b1d4"))
                 .foregroundColor(.white)
                 .cornerRadius(8)
-                .padding(.top)
                 .disabled(isSubmitting || reviewText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (rating == 0 && userExistingRating == nil))
             }
             .navigationTitle("Write a Review")
@@ -468,6 +468,7 @@ struct AddReviewView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundColor(.gray)
                 }
             }
         }
@@ -565,7 +566,7 @@ struct EditReviewView: View {
                         HStack {
                             ForEach(1...5, id: \.self) { star in
                                 Image(systemName: star <= Int(rating) ? "star.fill" : "star")
-                                    .foregroundColor(.yellow)
+                                    .foregroundColor(Color(hex:"57b9ff"))
                                     .onTapGesture {
                                         // If tapping the same star that's already selected, clear the rating
                                         if Double(star) == rating {

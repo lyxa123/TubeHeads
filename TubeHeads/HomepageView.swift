@@ -66,7 +66,6 @@ struct HomepageView: View {
                             .imageScale(.large)
                             .foregroundStyle(Color(hex: "#57b9ff"))
                         Text("Menu")
-                            .font(.subheadline)
                             .foregroundStyle(Color(hex: "#57b9ff"))
                     }
                 }
@@ -82,7 +81,6 @@ struct HomepageView: View {
                         showSearch = true
                     }) {
                         Text("Search")
-                            .font(.subheadline)
                             .foregroundStyle(Color(hex: "#57b9ff"))
                         Image(systemName: "magnifyingglass")
                             .imageScale(.large)
@@ -180,7 +178,7 @@ struct SideMenuView: View {
                         }
                     }
                     .padding(.horizontal)
-                    .padding(.vertical, 40)
+                    .padding(.vertical, 55)
                     
                     // Add divider
                     Divider()
@@ -202,7 +200,7 @@ struct SideMenuView: View {
                         }
                     } label: {
                         HStack {
-                            Image(systemName: "person.fill")
+                            Image(systemName: "person")
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 20, height: 20)
@@ -227,7 +225,7 @@ struct SideMenuView: View {
                         }
                     } label: {
                         HStack {
-                            Image(systemName: "person.2.fill") // or any icon you like
+                            Image(systemName: "person.crop.badge.magnifyingglass") // or any icon you like
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 20, height: 20)
@@ -253,7 +251,7 @@ struct SideMenuView: View {
                         }
                     } label: {
                         HStack {
-                            Image(systemName: "bookmark.fill")
+                            Image(systemName: "bookmark")
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 20, height: 20)
@@ -279,7 +277,7 @@ struct SideMenuView: View {
                         }
                     } label: {
                         HStack {
-                            Image(systemName: "list.bullet")
+                            Image(systemName: "book.pages")
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 20, height: 20)
@@ -305,7 +303,7 @@ struct SideMenuView: View {
                         }
                     } label: {
                         HStack {
-                            Image(systemName: "star.fill")
+                            Image(systemName: "star")
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 20, height: 20)
@@ -331,7 +329,7 @@ struct SideMenuView: View {
                         }
                     } label: {
                         HStack {
-                            Image(systemName: "flame.fill")
+                            Image(systemName: "bolt")
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 20, height: 20)
@@ -362,7 +360,7 @@ struct SideMenuView: View {
                         }
                     } label: {
                         HStack {
-                            Image(systemName: "gear")
+                            Image(systemName: "gearshape")
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 20, height: 20)
@@ -372,7 +370,7 @@ struct SideMenuView: View {
                         }
                         .padding(.horizontal)
                         .padding(.vertical, 12)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.primary)
                         .contentShape(Rectangle())
                     }
                     
@@ -399,7 +397,7 @@ struct SideMenuView: View {
                         }
                         .padding(.horizontal)
                         .padding(.vertical, 12)
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color(hex: "517891"))
                         .contentShape(Rectangle())
                     }
                     
