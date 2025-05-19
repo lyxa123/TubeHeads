@@ -83,6 +83,32 @@ class FirestoreReviewService {
         // Always update the show's rating to ensure consistency
         try await updateShowRating(showId: showId, userId: userId, rating: rating)
         
+        // Send notification to followers about this rating
+        Task {
+            do {
+                // Get show details for the notification
+                let show = try await FirestoreShowService.shared.getShow(id: showId)
+                
+                // Get user's followers
+                let followers = try await FollowService.shared.getFollowers(userId: userId)
+                
+                // Send notification to each follower
+                for follower in followers {
+                    try await NotificationService.shared.sendRatingNotification(
+                        fromUserId: userId,
+                        fromUsername: username,
+                        toUserId: follower.id,
+                        showId: showId,
+                        showName: show.name,
+                        rating: rating
+                    )
+                }
+            } catch {
+                // Log error but don't fail the review creation if notification fails
+                print("Error sending rating notifications: \(error.localizedDescription)")
+            }
+        }
+        
         return reviewRef.documentID
     }
     
