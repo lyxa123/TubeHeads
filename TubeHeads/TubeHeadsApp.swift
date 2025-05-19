@@ -7,6 +7,7 @@ import SwiftUI
 import SwiftData
 import FirebaseCore
 import FirebaseFirestore //  Added for Firestore offline support
+import FirebaseMessaging // Added for Push Notifications
 
 @main
 struct TubeHeadsApp: App {
@@ -54,6 +55,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         
         // Initialize the LocationManager
         _ = LocationManager.shared
+        
+        // Initialize and setup NotificationService
+        NotificationService.shared.setupNotifications()
         
         return true
     }
