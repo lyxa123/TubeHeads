@@ -8,7 +8,7 @@ struct SearchFriendsView: View {
     var body: some View {
         NavigationView {
             VStack {
-                TextField("Search users...", text: $searchText)
+                TextField("Start typing to find a user...", text: $searchText)
                     .padding(10)
                     .background(Color(.systemGray6))
                     .cornerRadius(10)

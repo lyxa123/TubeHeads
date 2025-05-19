@@ -15,8 +15,8 @@ struct UserListsView: View {
     var userId: String?
     
     enum ListFilter: String, CaseIterable {
-        case yourList = "Your List"
-        case likedList = "Liked List"
+        case yourList = "Your Lists"
+        case likedList = "Liked Lists"
     }
     
     var body: some View {
@@ -35,10 +35,11 @@ struct UserListsView: View {
                         }) {
                             Text(filter.rawValue)
                                 .fontWeight(selectedFilter == filter ? .semibold : .regular)
+                                .foregroundColor(Color(hex: "77b1d4"))
                                 .padding(.vertical, 10)
                                 .padding(.horizontal, 20)
                         }
-                        .background(selectedFilter == filter ? Color.blue.opacity(0.2) : Color.clear)
+                        .background(selectedFilter == filter ? Color(hex: "57b9ff").opacity(0.2) : Color.clear)
                         .cornerRadius(4)
                     }
                     
@@ -65,7 +66,7 @@ struct UserListsView: View {
                         }
                     }
                     .padding()
-                    .background(Color.blue)
+                    .background(Color(hex: "77b1d4"))
                     .foregroundColor(.white)
                     .cornerRadius(8)
                 }
@@ -104,7 +105,7 @@ struct UserListsView: View {
                                 Text("Create List")
                             }
                             .padding()
-                            .background(Color.blue)
+                            .background(Color(hex: "77b1d4"))
                             .foregroundColor(.white)
                             .cornerRadius(8)
                         }
@@ -163,8 +164,10 @@ struct UserListsView: View {
                         Button(action: {
                             showCreateListSheet = true
                         }) {
+                            Text("Create")
                             Image(systemName: "plus")
                         }
+                        .foregroundColor(Color(hex: "57b9ff"))
                     }
                 }
             }
@@ -258,7 +261,7 @@ struct WatchedShowsListCard: View {
                     .foregroundColor(.primary)
                 
                 Image(systemName: "eye.fill")
-                    .foregroundColor(.blue)
+                    .foregroundColor(.primary)
                     .font(.caption)
                 
                 Spacer()
@@ -468,7 +471,7 @@ struct LikedListCardView: View {
                     .foregroundColor(.primary)
                 
                 Image(systemName: "heart.fill")
-                    .foregroundColor(.red)
+                    .foregroundColor(Color(hex: "#77b1d4"))
                     .font(.caption)
                 
                 Spacer()
@@ -484,7 +487,7 @@ struct LikedListCardView: View {
             if !creatorUsername.isEmpty {
                 Text("Created by: \(creatorUsername)")
                     .font(.caption)
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color(hex: "57b9ff"))
             }
             
             // Show preview images (if available)
@@ -616,6 +619,7 @@ struct CreateListView: View {
                         .frame(height: 80)
                     
                     Toggle("Private List", isOn: $isPrivate)
+                        .tint(Color(hex: "57b9ff"))
                 }
                 
                 if let error = errorMessage {
@@ -629,7 +633,7 @@ struct CreateListView: View {
             .navigationBarItems(
                 leading: Button("Cancel") {
                     presentationMode.wrappedValue.dismiss()
-                },
+                }.foregroundColor(.gray),
                 trailing: Button(action: createList) {
                     if isCreating {
                         ProgressView()
@@ -774,7 +778,7 @@ struct ListDetailView: View {
                             loadShows()
                         }
                         .padding()
-                        .background(Color.blue)
+                        .background(Color(hex: "77b1d4"))
                         .foregroundColor(.white)
                         .cornerRadius(8)
                     }
@@ -858,7 +862,7 @@ struct ListDetailView: View {
                             showingRemoveLikedListConfirmation = true
                         }) {
                             Image(systemName: "heart.fill")
-                                .foregroundColor(.red)
+                                .foregroundColor(Color(hex: "#77b1d4"))
                         }
                     }
                 }
@@ -1181,7 +1185,7 @@ struct ShowEditItemView: View {
                 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 24))
-                    .foregroundColor(isSelected ? .blue : .gray)
+                    .foregroundColor(isSelected ? Color(hex: "#57b9ff") : .gray)
                     .background(Circle().fill(Color.white))
                     .padding(8)
             }
@@ -1243,8 +1247,8 @@ struct ShowGridItemView: View {
                 .font(.subheadline)
                 .fontWeight(.medium)
                 .lineLimit(1)
-                .foregroundColor(Color(hex: "57b9ff"))
-            
+                .foregroundColor(.black)
+
             // Release year
             Text(show.releaseYear)
                 .font(.caption)

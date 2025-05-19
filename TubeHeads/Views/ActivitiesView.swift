@@ -37,11 +37,6 @@ struct ActivitiesView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Activities")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .padding(.horizontal)
-                
                 // Suggested users section
                 SuggestedUsersView()
                     .padding(.top, 8)
@@ -97,6 +92,7 @@ struct ActivitiesView: View {
                 .padding(.top, 8)
             }
             .padding(.top)
+            .navigationTitle("Activities")
         }
         .navigationBarTitle("", displayMode: .inline)
         .onAppear {
@@ -224,7 +220,7 @@ struct ActivityCard: View {
                 // Rating
                 HStack(spacing: 2) {
                     Image(systemName: "star.fill")
-                        .foregroundColor(.yellow)
+                        .foregroundColor(Color(hex: "#57b9ff"))
                         .font(.caption)
                     
                     Text(String(format: "%.1f", activity.rating ?? 0))
